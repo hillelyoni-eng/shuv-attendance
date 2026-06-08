@@ -466,6 +466,7 @@
         <input id="dashSearch" placeholder="חיפוש מהיר לפי שם — איפה נמצא עכשיו…" />
       </div>
       <button class="btn ghost sm" id="dashRefresh">↻ רענון</button>
+      <button class="btn primary sm" id="exportImg">📸 תמונת מצב</button>
     </div>
     <div class="board" id="board"></div>
   </section>
@@ -1576,6 +1577,7 @@ function bind(){
     if(connMode==='cloud'){try{await Data.refreshCloud();}catch(e){}}
     renderAll();toast('רוענן');
   });
+  $('#exportImg').addEventListener('click',()=>{ exportStatusImage().catch(e=>toast('שגיאה: '+e.message,'err')); });
 
   // planning nav
   $('#planPrev').onclick=()=>{planWeekStart=addDays(planWeekStart,-7);renderPlanning();};
@@ -1745,6 +1747,100 @@ function exportCSV(){
   }));
   download('shuv-archive-'+Date.now()+'.csv','﻿'+lines.join('\n'),'text/csv');
   toast('יוצא '+rows.length+' רשומות','ok');
+}
+async function exportStatusImage(){
+  try{ await document.fonts.load('800 40px Rubik'); await document.fonts.load('500 25px Rubik'); }catch(e){}
+  const now=new Date();
+  const live=state.assignments.filter(a=>status(a)==='live');
+  const oncall=live.filter(a=>a.travel_status==='oncall').sort((a,b)=>a.full_name.localeCompare(b.full_name,'he'));
+  const locLive=live.filter(a=>a.travel_status!=='oncall');
+  const defined=state.locations.map(l=>l.name);
+  const extra=Array.from(new Set(locLive.map(a=>a.location))).filter(n=>n&&!defined.includes(n));
+  const orderedLocs=[...defined,...extra].filter(Boolean);
+  const aliasStr=name=>{const l=state.locations.find(x=>x.name===name);return l&&l.aliases?l.aliases.split(',').map(s=>s.trim()).filter(Boolean).join(' / '):'';};
+
+  const W=1080, padX=54, scale=2, gap=14;
+  const nameFont='500 25px Rubik, Arial, sans-serif';
+  const maxNamesW=W-padX*2-150;
+  const meas=document.createElement('canvas').getContext('2d');
+  function wrap(text){meas.font=nameFont;const words=text.split(' ');const out=[];let cur='';words.forEach(w=>{const t=cur?cur+' '+w:w;if(meas.measureText(t).width>maxNamesW&&cur){out.push(cur);cur=w;}else cur=t;});if(cur)out.push(cur);return out.length?out:['—'];}
+  const bh=n=>92+n*32;
+
+  const blocks=[];
+  orderedLocs.forEach(name=>{
+    const ppl=locLive.filter(a=>a.location===name);
+    const present=ppl.filter(a=>a.travel_status==='present');
+    const enr=ppl.filter(a=>a.travel_status==='enroute');
+    const arr=present.map(p=>p.full_name).concat(enr.map(p=>'🚗 '+p.full_name+' (בדרך)'));
+    blocks.push({name,alias:aliasStr(name),count:present.length,enr:enr.length,lines:arr.length?wrap(arr.join('    ·    ')):['—'],accent:'#2dd4bf'});
+  });
+  if(oncall.length){
+    blocks.push({name:'כונני ענף',alias:'',count:oncall.length,enr:0,
+      lines:wrap(oncall.map(p=>p.full_name+(p.location?' ('+p.location+')':'')).join('    ·    ')),accent:'#c084fc',oncall:true});
+  }
+
+  const headerH=176, summaryH=58, footerH=58;
+  let totalH=headerH+summaryH+footerH;
+  blocks.forEach(b=>totalH+=bh(b.lines.length)+gap);
+
+  const c=document.createElement('canvas');c.width=W*scale;c.height=totalH*scale;
+  const ctx=c.getContext('2d');ctx.scale(scale,scale);
+  const rr=(x,y,w,h,r)=>{ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();};
+
+  ctx.fillStyle='#0c1014';ctx.fillRect(0,0,W,totalH);
+  ctx.fillStyle='#2dd4bf';ctx.fillRect(0,0,W,7);
+  ctx.direction='rtl';
+
+  // header
+  ctx.fillStyle='#2dd4bf';rr(W-padX-58,28,58,58,15);ctx.fill();
+  ctx.fillStyle='#06201d';ctx.font='800 34px Rubik, sans-serif';ctx.textAlign='center';ctx.fillText('ש',W-padX-29,68);
+  ctx.textAlign='right';ctx.fillStyle='#e8eef3';ctx.font='700 38px Rubik, sans-serif';
+  ctx.fillText('שו"ב נוכחות — תמונת מצב',W-padX-76,58);
+  ctx.fillStyle='#9bb0c0';ctx.font='500 23px Rubik, sans-serif';
+  ctx.fillText(now.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'  ·  '+now.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}),W-padX-76,92);
+
+  // summary
+  const totalPresent=locLive.filter(a=>a.travel_status==='present').length;
+  const totalEnr=locLive.filter(a=>a.travel_status==='enroute').length;
+  ctx.textAlign='right';ctx.fillStyle='#2dd4bf';ctx.font='700 26px Rubik, sans-serif';
+  ctx.fillText(`סה"כ נוכחים: ${totalPresent}      🚗 בדרך: ${totalEnr}      🔔 כונני ענף: ${oncall.length}`,W-padX,headerH+20);
+
+  // blocks
+  let y=headerH+summaryH;
+  blocks.forEach(b=>{
+    const h=bh(b.lines.length);
+    ctx.fillStyle='#161e26';rr(padX,y,W-padX*2,h,16);ctx.fill();
+    ctx.strokeStyle='#27333d';ctx.lineWidth=1;rr(padX,y,W-padX*2,h,16);ctx.stroke();
+    // title (right)
+    ctx.textAlign='right';ctx.fillStyle='#e8eef3';ctx.font='700 28px Rubik, sans-serif';
+    const t=(b.oncall?'🔔 ':'📍 ')+b.name;
+    ctx.fillText(t,W-padX-22,y+46);
+    if(b.alias){const tw=ctx.measureText(t).width;ctx.fillStyle='#65788a';ctx.font='500 20px Rubik, sans-serif';ctx.fillText('('+b.alias+')',W-padX-22-tw-12,y+46);}
+    // count (left, big)
+    ctx.textAlign='left';ctx.fillStyle=b.accent;ctx.font='800 42px Rubik, sans-serif';
+    ctx.fillText(String(b.count),padX+24,y+50);
+    if(b.enr){ctx.fillStyle='#f0b429';ctx.font='600 17px Rubik, sans-serif';ctx.fillText('+'+b.enr+' בדרך',padX+24,y+72);}
+    // names (right)
+    ctx.textAlign='right';ctx.fillStyle='#9bb0c0';ctx.font=nameFont;
+    b.lines.forEach((ln,i)=>ctx.fillText(ln,W-padX-22,y+80+i*32));
+    y+=h+gap;
+  });
+
+  // footer
+  ctx.textAlign='center';ctx.fillStyle='#65788a';ctx.font='400 19px Rubik, sans-serif';
+  ctx.fillText('הופק ממערכת שו"ב נוכחות · '+now.toLocaleString('he-IL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}),W/2,totalH-22);
+
+  c.toBlob(async(blob)=>{
+    if(!blob){toast('יצירת התמונה נכשלה','err');return;}
+    const fname='status-'+now.toISOString().slice(0,16).replace(/[:T]/g,'-')+'.png';
+    const file=new File([blob],fname,{type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file],title:'תמונת מצב נוכחות'}); return; }catch(e){}
+    }
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fname;a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+    toast('תמונת המצב יוצאה','ok');
+  },'image/png');
 }
 function download(name,content,type){
   const blob=new Blob([content],{type:type||'application/json'});
