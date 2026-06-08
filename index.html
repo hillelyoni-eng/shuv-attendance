@@ -619,12 +619,14 @@
         <button class="btn sm" data-shift="evening">🌆 משמרת ערב 15:00–21:00</button>
       </div>
       <div class="row" style="gap:8px">
-        <button class="btn sm" data-dur="4">+4 שעות</button>
+        <button class="btn sm" data-dur="4">+4ש'</button>
+        <button class="btn sm" data-dur="8">+8ש'</button>
         <button class="btn sm" data-dur="12">12ש'</button>
         <button class="btn sm" data-dur="24">24ש'</button>
+        <button class="btn sm" data-until="22:00">עד 22:00</button>
         <button class="btn sm" data-dur="0">פתוח</button>
       </div>
-      <div class="form-note">בחר משמרת קבועה או הגדר זמנים ידנית.</div>
+      <div class="form-note">ברירת מחדל: נוכחות עד 21:00. בחר משמרת/משך או הגדר זמנים ידנית.</div>
     </div>
     <div class="modal-foot">
       <button class="btn primary" id="asgSave">שמור שיבוץ</button>
@@ -1327,8 +1329,10 @@ function openAsg(id){
     fillAsgPeople();fillAsgLocs();
     aT.innerHTML='<option>—</option>';
     $('#asgTravel').value='present';
-    $('#asgStart').value=localInputValue(new Date());
-    $('#asgEnd').value='';
+    const now=new Date();
+    $('#asgStart').value=localInputValue(now);
+    const de=new Date(now); de.setHours(21,0,0,0);            // ברירת מחדל: עד 21:00
+    $('#asgEnd').value = de>now ? localInputValue(de) : '';
     $('#asgDelete').style.display='none';
   }
   syncType();
@@ -1440,6 +1444,7 @@ async function executeCommand(person,action,location,when,shift){
   const ts=when.toISOString();
   let st=ts, et=null;
   if(shift){ const w=shiftWindow(shift,new Date()); st=w.start.toISOString(); et=w.end.toISOString(); }
+  else if(action==='present'||action==='enroute'){ const e=new Date(st); e.setHours(21,0,0,0); if(e>new Date(st)) et=e.toISOString(); } // ברירת מחדל עד 21:00
   const shTxt = shift?' · '+shift.ic+' '+shift.label:'';
   const open=state.assignments.find(a=>a.full_name===person.full_name && status(a)==='live');
   try{
@@ -1451,6 +1456,7 @@ async function executeCommand(person,action,location,when,shift){
     if(action==='present' && open && open.location===location){
       const patch={travel_status:'present'};
       if(shift){patch.start_time=st;patch.end_time=et;}
+      else if(!open.end_time){ const e=new Date(); e.setHours(21,0,0,0); if(e>new Date(open.start_time)) patch.end_time=e.toISOString(); }
       await Data.updateAsg(open.id,patch);
       toast('✓ '+person.full_name+' — הגיע/ה ל'+location+shTxt,'ok');
       return;
@@ -1633,6 +1639,14 @@ function bind(){
     const w=shiftWindow(sh,base);
     $('#asgStart').value=localInputValue(w.start);
     $('#asgEnd').value=localInputValue(w.end);
+  });
+  $$('[data-until]').forEach(b=>b.onclick=()=>{
+    const [h,m]=b.dataset.until.split(':').map(Number);
+    const base=$('#asgStart').value?new Date($('#asgStart').value):new Date();
+    if(!$('#asgStart').value)$('#asgStart').value=localInputValue(base);
+    const e=new Date(base); e.setHours(h,m,0,0);
+    if(e<=base) e.setDate(e.getDate()+1);
+    $('#asgEnd').value=localInputValue(e);
   });
 
   // auth gate
