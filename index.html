@@ -383,7 +383,19 @@
   .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .dt-row{display:flex;gap:8px}
   .dt-row .date-inp{flex:1;min-width:0}
-  .date-inp{text-align:center;font-variant-numeric:tabular-nums;letter-spacing:.5px;font-weight:600}
+  .date-inp{text-align:center;font-variant-numeric:tabular-nums;letter-spacing:.5px;font-weight:600;cursor:pointer}
+  .cal{position:fixed;z-index:120;display:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px;box-shadow:var(--shadow);width:266px}
+  .cal.open{display:block;animation:fade .12s}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .cal-title{font-weight:700;font-size:14px}
+  .cal-nav{width:30px;height:30px;border-radius:8px;color:var(--txt-dim);font-size:18px}
+  .cal-nav:hover{background:var(--panel-2);color:var(--txt)}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .cal-dow{text-align:center;font-size:11px;color:var(--txt-faint);font-weight:600;padding:3px 0}
+  .cal-day{height:32px;border-radius:7px;font-size:13px;font-weight:500;color:var(--txt)}
+  .cal-day:hover{background:var(--panel-2)}
+  .cal-day.today{border:1px solid var(--accent-dim)}
+  .cal-day.sel{background:var(--accent);color:#06201d;font-weight:700}
   .time-inp{flex:0 0 86px;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:1.5px;font-weight:600}
   .sel-add{display:flex;gap:8px}
   .sel-add select{flex:1}
@@ -660,6 +672,7 @@
         <button class="btn sm" data-dur="0">פתוח</button>
       </div>
       <div class="form-note">ברירת מחדל: נוכחות עד 21:00. בחר משמרת/משך או הגדר זמנים ידנית.</div>
+      <button class="btn" id="asgRecur" style="width:100%;justify-content:center;border-color:var(--accent-dim);color:var(--accent)">📅 שבץ כל יום עד יום חמישי (כולל)</button>
     </div>
     <div class="modal-foot">
       <button class="btn primary" id="asgSave">שמור שיבוץ</button>
@@ -695,6 +708,8 @@
     </div>
   </div>
 </div>
+
+<div class="cal" id="cal"></div>
 
 <!-- ===== Auth Gate ===== -->
 <div class="auth-gate" id="authGate">
@@ -870,6 +885,16 @@ function orderedLocations(){      // key/priority locations first, then the rest
   const defined=state.locations.slice().sort((a,b)=>(b.priority?1:0)-(a.priority?1:0)).map(l=>l.name);
   const extra=Array.from(new Set(state.assignments.map(a=>a.location))).filter(n=>n&&!defined.includes(n));
   return [...defined,...extra].filter(Boolean);
+}
+function overlaps(a,s,e){            // does assignment a overlap [s,e] (e null = open)?
+  const as=new Date(a.start_time), ae=a.end_time?new Date(a.end_time):new Date(8.64e15);
+  const ee=e?e:new Date(8.64e15);
+  return as<ee && ae>s;
+}
+function nextThursday(from){         // first Thursday >= from (4 = Thu)
+  const d=new Date(from); d.setHours(0,0,0,0);
+  while(d.getDay()!==4) d.setDate(d.getDate()+1);
+  return d;
 }
 function status(a){
   const now=Date.now();const s=new Date(a.start_time).getTime();
@@ -1438,7 +1463,66 @@ function syncType(){
   const t=opt&&opt.dataset.type;
   if(t&&!editingId){$('#asgType').innerHTML=`<option>${esc(t)}</option>`;}
 }
-function closeAsg(){$('#asgModalBg').classList.remove('open');editingId=null;}
+function closeAsg(){$('#asgModalBg').classList.remove('open');editingId=null;closeCal();}
+
+/* ----- date-picker calendar popup ----- */
+const calState={target:null,view:null};
+function openCal(input){
+  calState.target=input;
+  const d=parseDateStr(input.value);
+  const base=new Date();
+  calState.view = d?new Date(d.y,d.mo-1,1):new Date(base.getFullYear(),base.getMonth(),1);
+  renderCal();
+  const r=input.getBoundingClientRect();
+  const cal=$('#cal');
+  cal.style.top=Math.min(r.bottom+6, window.innerHeight-330)+'px';
+  cal.style.left=Math.max(8, Math.min(r.left, window.innerWidth-274))+'px';
+  cal.classList.add('open');
+}
+function closeCal(){const c=$('#cal');if(c)c.classList.remove('open');calState.target=null;}
+function renderCal(){
+  const v=calState.view, y=v.getFullYear(), mo=v.getMonth();
+  const startDow=new Date(y,mo,1).getDay();
+  const dim=new Date(y,mo+1,0).getDate();
+  const sel=calState.target?parseDateStr(calState.target.value):null;
+  const t=new Date();
+  let h='<div class="cal-head"><button class="cal-nav" data-d="-1">›</button><div class="cal-title">'+v.toLocaleDateString('he-IL',{month:'long',year:'numeric'})+'</div><button class="cal-nav" data-d="1">‹</button></div><div class="cal-grid">';
+  ['א','ב','ג','ד','ה','ו','ש'].forEach(w=>h+='<div class="cal-dow">'+w+'</div>');
+  for(let i=0;i<startDow;i++)h+='<div></div>';
+  for(let day=1;day<=dim;day++){
+    const isSel=sel&&sel.y===y&&sel.mo===mo+1&&sel.d===day;
+    const isToday=t.getFullYear()===y&&t.getMonth()===mo&&t.getDate()===day;
+    h+='<button class="cal-day'+(isSel?' sel':'')+(isToday?' today':'')+'" data-day="'+day+'">'+day+'</button>';
+  }
+  $('#cal').innerHTML=h+'</div>';
+}
+
+/* ----- recurring: every day until Thursday (inclusive) ----- */
+async function recurUntilThursday(){
+  const full_name=$('#asgPerson').value.trim();
+  const population_type=$('#asgType').value.trim();
+  const location=$('#asgLoc').value.trim();
+  const travel=$('#asgTravel').value;
+  const sd=dtGet('asgStart'), ed=dtGet('asgEnd');
+  if(!full_name){toast('בחר שם','err');return;}
+  if(!location && travel!=='oncall'){toast('בחר מיקום','err');return;}
+  if(!sd){toast('הזן תאריך ושעת התחלה','err');return;}
+  const sTOD={h:sd.getHours(),m:sd.getMinutes()};
+  const eTOD=ed?{h:ed.getHours(),m:ed.getMinutes()}:null;
+  const startDay=new Date(sd);startDay.setHours(0,0,0,0);
+  const thu=nextThursday(startDay);
+  let created=0,skipped=0;
+  for(let d=new Date(startDay); d<=thu; d.setDate(d.getDate()+1)){
+    const occStart=new Date(d);occStart.setHours(sTOD.h,sTOD.m,0,0);
+    let occEnd=null;
+    if(eTOD){occEnd=new Date(d);occEnd.setHours(eTOD.h,eTOD.m,0,0);if(occEnd<=occStart)occEnd.setDate(occEnd.getDate()+1);}
+    if(location && state.assignments.some(a=>a.id!=editingId && a.full_name===full_name && a.location===location && overlaps(a,occStart,occEnd))){skipped++;continue;}
+    const rec={full_name,population_type:population_type==='—'?'סדיר':population_type,location:location||'',travel_status:travel,start_time:occStart.toISOString(),end_time:occEnd?occEnd.toISOString():null};
+    try{await Data.addAsg(rec);created++;}catch(e){}
+  }
+  closeAsg();
+  toast('נוצרו '+created+' שיבוצים (עד יום חמישי)'+(skipped?' · דולגו '+skipped+' כפילויות':''),created?'ok':'err');
+}
 
 async function saveAsg(){
   const full_name=$('#asgPerson').value.trim();
@@ -1450,6 +1534,9 @@ async function saveAsg(){
   if(!location && travel!=='oncall'){toast('בחר מיקום','err');return;}
   if(!sd){toast('הזן תאריך ושעת התחלה','err');return;}
   if(ed && ed<=sd){toast('זמן הסיום חייב להיות אחרי ההתחלה','err');return;}
+  if(location && state.assignments.some(a=>a.id!=editingId && a.full_name===full_name && a.location===location && overlaps(a,sd,ed))){
+    toast(full_name+' כבר משובץ/ת ב'+location+' בזמן חופף — לא ניתן לשבץ פעמיים','err');return;
+  }
   const rec={full_name,population_type:population_type==='—'?'סדיר':population_type,location,
     travel_status:travel,
     start_time:sd.toISOString(), end_time:ed?ed.toISOString():null};
@@ -1769,7 +1856,25 @@ function bind(){
   ['asgStartD','asgEndD','fFrom','fTo'].forEach(id=>{
     const inp=$('#'+id);
     inp.addEventListener('blur',()=>{ inp.value=normDate(inp.value); });
+    inp.addEventListener('focus',()=>openCal(inp));
+    inp.addEventListener('click',()=>openCal(inp));
   });
+  // calendar interactions (mousedown prevents the input from losing focus mid-click)
+  $('#cal').addEventListener('mousedown',e=>e.preventDefault());
+  $('#cal').addEventListener('click',e=>{
+    const nav=e.target.closest('.cal-nav');
+    if(nav){calState.view=new Date(calState.view.getFullYear(),calState.view.getMonth()+ (+nav.dataset.d),1);renderCal();return;}
+    const day=e.target.closest('.cal-day');
+    if(day && calState.target){
+      const v=calState.view,p=n=>String(n).padStart(2,'0');
+      calState.target.value=p(+day.dataset.day)+'/'+p(v.getMonth()+1)+'/'+v.getFullYear();
+      calState.target.dispatchEvent(new Event('change'));
+      closeCal();
+    }
+  });
+  document.addEventListener('mousedown',e=>{ if(!e.target.closest('#cal') && !e.target.classList.contains('date-inp')) closeCal(); });
+  // recurring assignment until Thursday
+  $('#asgRecur').onclick=recurUntilThursday;
 
   // auth gate
   $('#googleBtn').onclick=googleSignIn;
@@ -1796,9 +1901,9 @@ function bind(){
   $('#sqlBlock').textContent=SQL_SETUP;
 
   // generic modal close
-  $$('[data-close]').forEach(b=>b.onclick=e=>e.target.closest('.modal-bg').classList.remove('open'));
-  $$('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')$$('.modal-bg.open').forEach(m=>m.classList.remove('open'));});
+  $$('[data-close]').forEach(b=>b.onclick=e=>{closeCal();e.target.closest('.modal-bg').classList.remove('open');});
+  $$('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m){closeCal();m.classList.remove('open');}}));
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeCal();$$('.modal-bg.open').forEach(m=>m.classList.remove('open'));}});
 }
 
 function openCloud(){
