@@ -225,6 +225,45 @@
   .travel-badge{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:var(--warn);background:rgba(240,180,41,.15);padding:2px 8px;border-radius:6px;margin-inline-start:5px}
   .pcard .pc-actions button.arrived{color:var(--ok);border-color:rgba(63,207,142,.35)}
   .pcard .pc-actions button.arrived:hover{background:rgba(63,207,142,.12);color:var(--ok)}
+  .pcard.oncall{border-color:rgba(192,132,252,.4);background:linear-gradient(160deg,rgba(192,132,252,.07),var(--bg-2))}
+  .pcard.oncall .av{background:var(--pop-miluim);color:#fff}
+  .oncall-badge{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:var(--pop-miluim);background:rgba(192,132,252,.15);padding:2px 8px;border-radius:6px;margin-inline-start:5px}
+
+  /* ===== Command bar (NLP) ===== */
+  .cmdbar{display:flex;gap:10px;align-items:stretch;background:linear-gradient(160deg,rgba(45,212,191,.06),var(--panel));border:1px solid var(--accent-dim);border-radius:14px;padding:11px}
+  .cmdbar .cmd-ico{flex:0 0 auto;width:42px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:20px}
+  .cmdbar .cmd-wrap{flex:1;display:flex}
+  .cmdbar input{border:1px solid var(--line);background:var(--bg-2)}
+  .cmd-hint{font-size:12px;color:var(--txt-faint);margin:9px 2px 18px;line-height:1.6}
+  .cmd-hint b{color:var(--txt-dim);font-weight:600}
+
+  /* ===== Mobile ===== */
+  @media(max-width:860px){
+    .board{flex-direction:column;overflow-x:visible}
+    .col{flex:1 1 auto;width:100%;max-height:none}
+    .mgr-grid{grid-template-columns:1fr}
+  }
+  @media(max-width:640px){
+    main{padding:12px}
+    header.topbar{flex-wrap:wrap;gap:9px;padding:10px 12px}
+    .brand h1{font-size:15px}
+    .clock{margin-inline-start:auto}
+    .clock .t{font-size:16px}.clock .d{font-size:10px}
+    .conn{padding:6px 10px;font-size:11.5px}
+    .userChip{max-width:46%}
+    .stats{grid-template-columns:repeat(2,1fr);gap:9px}
+    .stat{padding:13px 14px}.stat .n{font-size:24px}
+    .grid-2{grid-template-columns:1fr}
+    .cmdbar{flex-direction:column}
+    .cmdbar .cmd-ico{width:100%;height:34px}
+    .tbl-wrap{overflow-x:auto}
+    table{min-width:680px}
+    .section-title{flex-wrap:wrap;gap:4px}
+    .modal{max-width:100%}
+    .fab{bottom:18px;inset-inline-end:18px;padding:12px 17px;font-size:14px}
+    .add-inline{flex-wrap:wrap}
+    .add-inline input{flex:1 1 100%}
+  }
 
   /* ===== Tables ===== */
   .tbl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
@@ -243,6 +282,7 @@
   .status-pill.future{color:var(--pop-saddir);background:rgba(91,157,255,.12)}
   .status-pill.past{color:var(--txt-faint);background:rgba(101,120,138,.12)}
   .status-pill.enroute{color:var(--warn);background:rgba(240,180,41,.12)}
+  .status-pill.oncall{color:var(--pop-miluim);background:rgba(192,132,252,.12)}
   .empty-state{padding:60px 20px;text-align:center;color:var(--txt-faint)}
   .empty-state .big{font-size:15px;color:var(--txt-dim);margin-bottom:6px;font-weight:600}
 
@@ -399,6 +439,12 @@
 <main>
   <!-- ============ DASHBOARD ============ -->
   <section class="view active" id="view-dash">
+    <div class="cmdbar">
+      <div class="cmd-ico">⚡</div>
+      <div class="cmd-wrap"><input id="cmdInput" placeholder="כתוב פקודה חופשית… לדוגמה: רוסלן בדרך לבסיס צדי · סאסי הגיע לתיבת נוח · יוני יצא הביתה 14:30" /></div>
+      <button class="btn primary" id="cmdRun">בצע</button>
+    </div>
+    <div class="cmd-hint">המערכת מזהה לבד: <b>בדרך ל…</b> = בנסיעה · <b>הגיע ל…</b> = נוכח · <b>בשמירות / נמצא ב…</b> = נוכח · <b>כונן ענפי</b> · <b>יצא הביתה</b> = סיום נוכחות. אפשר להוסיף שעה לעדכון בדיעבד (לדוגמה <b>14:30</b>).</div>
     <div class="stats" id="dashStats"></div>
     <div class="row" style="margin-bottom:18px">
       <div class="search">
@@ -492,11 +538,10 @@
       <h3>🔐 ניהול הרשאות גישה <span class="badge" id="permCnt" style="background:var(--accent-soft);color:var(--accent);padding:1px 8px;border-radius:999px;font-size:12px"></span></h3>
       <div class="add-inline">
         <input id="newAllowEmail" placeholder="כתובת Gmail לאישור…" dir="ltr" style="text-align:right" />
-        <select id="newAllowRole" style="flex:0 0 130px"><option value="member">מנהל רגיל</option><option value="admin">מנהל-על</option></select>
         <button class="btn primary sm" id="addAllow">אשר גישה</button>
       </div>
       <div id="allowList"></div>
-      <div class="form-note" style="margin-top:12px">רק כתובות ברשימה יכולות להיכנס למערכת. "מנהל-על" יכול גם לנהל את רשימת ההרשאות הזו. אינך יכול להסיר את עצמך.</div>
+      <div class="form-note" style="margin-top:12px">רק כתובות ברשימה יכולות להיכנס למערכת. <b>כל משתמש מורשה</b> יכול להוסיף או להסיר מורשים. אינך יכול להסיר את עצמך. שלח למורשה חדש את הקישור — הוא ייכנס עם Google.</div>
     </div>
     <div class="card" style="margin-top:18px">
       <h3>🗄️ נתונים</h3>
@@ -548,6 +593,7 @@
         <select id="asgTravel">
           <option value="present">✅ נוכח במקום</option>
           <option value="enroute">🚗 בנסיעה למיקום</option>
+          <option value="oncall">🔔 כונן ענפי (זמין במספר מיקומים)</option>
         </select></label>
       <div class="grid-2">
         <label class="fld"><span class="lbl">תחילת משמרת *</span>
@@ -871,7 +917,7 @@ async function signOut(){
 }
 async function refreshAllowlist(){
   const card=$('#permCard');
-  if(connMode!=='cloud' || myRole!=='admin'){ card.style.display='none'; return; }
+  if(connMode!=='cloud' || !authUser){ card.style.display='none'; return; }
   card.style.display='';
   let rows=[];
   try{ rows=await Data.listAllowed(); }catch(e){ rows=[]; }
@@ -913,7 +959,8 @@ function renderDashboard(){
   $('#tabDashCnt').textContent = live.length;
 
   // stats
-  const present = live.filter(a=>a.travel_status!=='enroute');
+  const oncallPpl = live.filter(a=>a.travel_status==='oncall');
+  const present = live.filter(a=>a.travel_status!=='enroute' && a.travel_status!=='oncall');
   const enroute = live.filter(a=>a.travel_status==='enroute');
   const byPop = {'סדיר':0,'מילואים':0,'יועץ':0};
   live.forEach(a=>{byPop[a.population_type]=(byPop[a.population_type]||0)+1;});
@@ -921,6 +968,7 @@ function renderDashboard(){
   const stats=[
     {n:present.length,l:'נוכחים במקום',cls:'accent',ic:'🟢'},
     {n:enroute.length,l:'בדרך 🚗',ic:'🚗'},
+    {n:oncallPpl.length,l:'כונני ענף 🔔',ic:'🔔'},
     {n:activeLocs,l:'מיקומים פעילים',ic:'📍'},
     {n:byPop['סדיר'],l:'סדיר',ic:'🎖️'},
     {n:byPop['מילואים'],l:'מילואים',ic:'🪖'},
@@ -930,23 +978,33 @@ function renderDashboard(){
     `<div class="stat ${s.cls||''}"><div class="ic" style="font-size:24px">${s.ic}</div><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`
   ).join('');
 
-  // board — one column per location that has people, plus all defined locations
+  // board — dedicated on-call column + one column per location
   const board=$('#board');board.innerHTML='';
-  const locNames = Array.from(new Set([...state.locations.map(l=>l.name), ...live.map(a=>a.location)]));
-  // show locations that have live people first; keep configured-but-empty too
-  const filtered = q
-    ? live.filter(a=>a.full_name.includes(q))
-    : live;
-  const shownLocs = q
-    ? Array.from(new Set(filtered.map(a=>a.location)))
-    : locNames;
+  const filtered = q ? live.filter(a=>a.full_name.includes(q)) : live;
+  const oncallShown = filtered.filter(a=>a.travel_status==='oncall')
+    .sort((a,b)=> a.full_name.localeCompare(b.full_name,'he'));
+  const locItems = filtered.filter(a=>a.travel_status!=='oncall');
+  const locNames = q
+    ? Array.from(new Set(locItems.map(a=>a.location)))
+    : Array.from(new Set([...state.locations.map(l=>l.name), ...locItems.map(a=>a.location)])).filter(Boolean);
 
-  if(shownLocs.length===0){
-    board.innerHTML='<div class="empty-state" style="width:100%"><div class="big">אין נוכחות פעילה כרגע</div>הוסף שיבוץ או הגדר מיקומים בלשונית הניהול</div>';
+  if(oncallShown.length===0 && locNames.length===0){
+    board.innerHTML='<div class="empty-state" style="width:100%"><div class="big">אין נוכחות פעילה כרגע</div>הוסף שיבוץ, כתוב פקודה למעלה, או הגדר מיקומים בלשונית הניהול</div>';
     return;
   }
-  shownLocs.forEach(loc=>{
-    const people = filtered.filter(a=>a.location===loc)
+  // on-call column (roving — appears first)
+  if(oncallShown.length){
+    const col=el('div','col');
+    col.appendChild(el('div','col-head',
+      `<span class="loc-dot" style="background:var(--pop-miluim)"></span><h3>🔔 כונני ענף</h3><span class="cnt" style="background:rgba(192,132,252,.15);color:var(--pop-miluim)">${oncallShown.length}</span>`));
+    const body=el('div','col-body');
+    oncallShown.forEach(a=>body.appendChild(personCard(a)));
+    col.appendChild(body);
+    board.appendChild(col);
+  }
+  // location columns
+  locNames.forEach(loc=>{
+    const people = locItems.filter(a=>a.location===loc)
       .sort((a,b)=> new Date(a.end_time||8.64e15)-new Date(b.end_time||8.64e15));
     if(q && people.length===0)return;
     const col=el('div','col');
@@ -966,7 +1024,9 @@ function personCard(a){
   const c=el('div','pcard');
   const pc=POP_CLASS[a.population_type]||'';
   const enroute = a.travel_status==='enroute';
+  const oncall = a.travel_status==='oncall';
   if(enroute)c.classList.add('enroute');
+  if(oncall)c.classList.add('oncall');
   let timeCls='';
   if(a.end_time){
     const left=(new Date(a.end_time)-Date.now())/60000;
@@ -975,16 +1035,19 @@ function personCard(a){
   const endTxt = a.end_time
     ? (timeCls==='overdue'?'חרג מהזמן · ':'עד ')+fmtTimeShort(a.end_time)
     : 'משמרת פתוחה';
+  const avatar = enroute?'🚗':oncall?'🔔':esc(initials(a.full_name));
+  const badge = enroute?'<span class="travel-badge">🚗 בנסיעה</span>'
+              : oncall?'<span class="oncall-badge">🔔 כונן ענפי</span>':'';
+  let meta;
+  if(enroute) meta=`<span class="time" style="color:var(--warn)">🚗 בדרך אל ${esc(a.location)}</span>`;
+  else if(oncall) meta=`<span class="time" style="color:var(--pop-miluim)">🔔 כונן ${a.location?'· בסיס '+esc(a.location):'· זמין'}</span>`;
+  else meta=`<span>⏱️ מ‑${fmtTimeShort(a.start_time)}</span><span class="time ${timeCls}">· ${endTxt}</span>`;
   c.innerHTML=`
     <div class="pc-top">
-      <div class="av">${enroute?'🚗':esc(initials(a.full_name))}</div>
-      <div class="nm">${esc(a.full_name)}<div class="sub"><span class="ptag ${pc}">${esc(a.population_type)}</span>${enroute?'<span class="travel-badge">🚗 בנסיעה</span>':''}</div></div>
+      <div class="av">${avatar}</div>
+      <div class="nm">${esc(a.full_name)}<div class="sub"><span class="ptag ${pc}">${esc(a.population_type)}</span>${badge}</div></div>
     </div>
-    <div class="pc-meta">
-      ${enroute
-        ? `<span class="time" style="color:var(--warn)">🚗 בדרך אל ${esc(a.location)}</span>`
-        : `<span>⏱️ מ‑${fmtTimeShort(a.start_time)}</span><span class="time ${timeCls}">· ${endTxt}</span>`}
-    </div>
+    <div class="pc-meta">${meta}</div>
     <div class="pc-actions">
       ${enroute?'<button class="arrived">✓ הגיע</button>':''}
       <button class="edit">עריכה</button>
@@ -1092,8 +1155,9 @@ function renderArchive(){
   rows.forEach(a=>{
     const st=status(a),pc=POP_CLASS[a.population_type]||'';
     const enroute = st==='live' && a.travel_status==='enroute';
-    const stCls = enroute?'enroute':st;
-    const stTxt = enroute?'🚗 בנסיעה':stLbl[st];
+    const oncall = st==='live' && a.travel_status==='oncall';
+    const stCls = enroute?'enroute':oncall?'oncall':st;
+    const stTxt = enroute?'🚗 בנסיעה':oncall?'🔔 כונן ענפי':stLbl[st];
     const tr=el('tr','',
       `<td><span class="nm">${esc(a.full_name)}</span></td>
        <td><span class="ptag ${pc}">${esc(a.population_type)}</span></td>
@@ -1188,7 +1252,7 @@ function openAsg(id){
     fillAsgPeople(a.full_name);
     fillAsgLocs(a.location);
     aT.innerHTML=`<option>${esc(a.population_type)}</option>`;
-    $('#asgTravel').value=a.travel_status==='enroute'?'enroute':'present';
+    $('#asgTravel').value=a.travel_status||'present';
     $('#asgStart').value=localInputValue(a.start_time);
     $('#asgEnd').value=a.end_time?localInputValue(a.end_time):'';
     $('#asgDelete').style.display='';
@@ -1216,17 +1280,97 @@ async function saveAsg(){
   const population_type=$('#asgType').value.trim();
   const location=$('#asgLoc').value.trim();
   const sv=$('#asgStart').value, ev=$('#asgEnd').value;
+  const travel=$('#asgTravel').value;
   if(!full_name){toast('בחר שם','err');return;}
-  if(!location){toast('בחר מיקום','err');return;}
+  if(!location && travel!=='oncall'){toast('בחר מיקום','err');return;}
   if(!sv){toast('הזן זמן התחלה','err');return;}
   if(ev && new Date(ev)<=new Date(sv)){toast('זמן הסיום חייב להיות אחרי ההתחלה','err');return;}
   const rec={full_name,population_type:population_type==='—'?'סדיר':population_type,location,
-    travel_status:$('#asgTravel').value,
+    travel_status:travel,
     start_time:new Date(sv).toISOString(), end_time:ev?new Date(ev).toISOString():null};
   try{
     if(editingId)await Data.updateAsg(editingId,rec);
     else await Data.addAsg(rec);
     closeAsg();toast(editingId?'השיבוץ עודכן':'השיבוץ נוסף','ok');
+  }catch(e){toast('שגיאה: '+e.message,'err');}
+}
+
+/* =========================================================================
+   Free-text command parser (Hebrew NLP — rule based)
+   "רוסלן בדרך לבסיס צדי" · "סאסי הגיע לתיבת נוח" · "יוני יצא הביתה 14:30"
+   ========================================================================= */
+function cmdParseTime(text){
+  const m=text.match(/(\d{1,2}):(\d{2})/);
+  if(!m)return new Date();
+  const h=+m[1],mi=+m[2];
+  if(h>23||mi>59)return new Date();
+  const d=new Date();d.setHours(h,mi,0,0);
+  return d;
+}
+function cmdFindPerson(text){
+  // whole-word match (avoids "בר" matching inside "ברק"); strip leading Hebrew prefixes
+  const words=text.split(/[\s,.;:!?"'()]+/).filter(Boolean);
+  const strip=w=>(/^[לבמהושכ].{2,}$/.test(w)?w.slice(1):w);
+  const wordSet=new Set([...words, ...words.map(strip)]);
+  let exact=null,sub=null;
+  state.personnel.forEach(p=>{
+    const tokens=String(p.full_name).split(/\s+/).filter(t=>t.length>=2);
+    if(!exact && tokens.some(t=>wordSet.has(t))) exact=p;
+    if(!sub && tokens.some(t=>text.includes(t))) sub=p;
+  });
+  return exact||sub;
+}
+function cmdFindLocations(text){
+  const res=[];
+  state.locations.forEach(l=>{
+    const idx=text.indexOf(l.name);
+    if(idx>=0)res.push({name:l.name,idx});
+  });
+  return res.sort((a,b)=>a.idx-b.idx);
+}
+async function runCommand(raw){
+  const text=(raw||'').trim();
+  if(!text)return;
+  const person=cmdFindPerson(text);
+  if(!person){toast('לא זוהה אדם מוכר בפקודה. ודא שהשם קיים ברשימת כוח האדם.','err');return;}
+  const when=cmdParseTime(text);
+  const locs=cmdFindLocations(text);
+  const lastLoc = locs.length?locs[locs.length-1].name:null;
+  const hasEnroute=/בדרך|בנסיעה|נוסע|בדרכו|מפנה/.test(text);
+  const hasHome=/הביתה|לבית|שוחרר|השתחרר|סיים|עזב/.test(text);
+  const hasOncall=/כונן/.test(text);
+  const hasArrived=/הגיע|נמצא|שמיר|נכנס|חזר ל|אצל/.test(text);
+  let action,location=null;
+  if(hasOncall){action='oncall';location=lastLoc||'';}
+  else if(hasEnroute){action='enroute';location=lastLoc;}
+  else if(hasHome){action='left';}
+  else if(hasArrived){action='present';location=lastLoc;}
+  else if(lastLoc){action='present';location=lastLoc;}
+  else {toast('לא הובן מה לעדכן עבור '+person.full_name+'. נסה: "בדרך ל…", "הגיע ל…", "יצא הביתה".','err');return;}
+  if((action==='enroute'||action==='present') && !location){toast('לא זוהה מיקום מוכר בפקודה.','err');return;}
+  await executeCommand(person,action,location,when);
+}
+async function executeCommand(person,action,location,when){
+  const ts=when.toISOString();
+  const open=state.assignments.find(a=>a.full_name===person.full_name && status(a)==='live');
+  try{
+    if(action==='left'){
+      if(open){await Data.updateAsg(open.id,{end_time:ts});toast('✓ '+person.full_name+' — סיום נוכחות'+(open.location?' מ'+open.location:'')+' ('+fmtTimeShort(ts)+')','ok');}
+      else{toast(person.full_name+' לא נמצא/ת כרגע בשיבוץ פעיל','err');}
+      return;
+    }
+    if(action==='present' && open && open.location===location && open.travel_status!=='present'){
+      await Data.updateAsg(open.id,{travel_status:'present'});
+      toast('✓ '+person.full_name+' — הגיע/ה ל'+location+' ('+fmtTimeShort(ts)+')','ok');
+      return;
+    }
+    if(open) await Data.updateAsg(open.id,{end_time:ts});
+    const rec={full_name:person.full_name,population_type:person.population_type,location:location||'',travel_status:action,start_time:ts,end_time:null};
+    await Data.addAsg(rec);
+    const lbl = action==='enroute'?'בדרך ל'+location
+              : action==='oncall'?'כונן ענפי'+(location?' (בסיס '+location+')':'')
+              : 'נוכח/ת ב'+location;
+    toast('✓ '+person.full_name+' — '+lbl+' ('+fmtTimeShort(ts)+')','ok');
   }catch(e){toast('שגיאה: '+e.message,'err');}
 }
 
@@ -1282,6 +1426,10 @@ function bind(){
   // periodic re-render so live/ending states stay fresh
   setInterval(()=>{if($('#view-dash').classList.contains('active'))renderDashboard();},30000);
 
+  // command bar (free-text NLP)
+  const runCmd=()=>{const v=$('#cmdInput').value;if(!v.trim())return;runCommand(v).then(()=>{$('#cmdInput').value='';});};
+  $('#cmdRun').onclick=runCmd;
+  $('#cmdInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runCmd();}});
   // dashboard
   $('#dashSearch').addEventListener('input',renderDashboard);
   $('#dashRefresh').addEventListener('click',async()=>{
@@ -1388,9 +1536,8 @@ function bind(){
   // access allowlist
   $('#addAllow').onclick=async()=>{
     const email=$('#newAllowEmail').value.trim().toLowerCase();
-    const role=$('#newAllowRole').value;
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast('הזן כתובת מייל תקינה','err');return;}
-    try{ await Data.addAllowed(email,role); $('#newAllowEmail').value=''; refreshAllowlist(); toast('הגישה אושרה ל‑'+email,'ok'); }
+    try{ await Data.addAllowed(email,'member'); $('#newAllowEmail').value=''; refreshAllowlist(); toast('הגישה אושרה ל‑'+email,'ok'); }
     catch(e){toast('שגיאה: '+e.message,'err');}
   };
   $('#newAllowEmail').addEventListener('keydown',e=>{if(e.key==='Enter')$('#addAllow').click();});
@@ -1431,7 +1578,7 @@ function exportCSV(){
   const stLbl={live:'נוכח',future:'מתוכנן',past:'הסתיים'};
   const lines=[hdr.join(',')].concat(rows.map(a=>{
     const st=status(a);
-    const stTxt=(st==='live'&&a.travel_status==='enroute')?'בנסיעה':stLbl[st];
+    const stTxt=(st==='live'&&a.travel_status==='enroute')?'בנסיעה':(st==='live'&&a.travel_status==='oncall')?'כונן ענפי':stLbl[st];
     return [
       a.full_name,a.population_type,a.location,fmtTime(a.start_time),
       a.end_time?fmtTime(a.end_time):'פתוח',durationStr(a),stTxt
