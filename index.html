@@ -359,6 +359,9 @@
   .modal-body{padding:20px;display:flex;flex-direction:column;gap:14px}
   .modal-foot{padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-start}
   .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .dt-row{display:flex;gap:8px}
+  .dt-row input[type=date]{flex:1;min-width:0}
+  .time-inp{flex:0 0 86px;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:1.5px;font-weight:600}
   .sel-add{display:flex;gap:8px}
   .sel-add select{flex:1}
   .addbtn{flex:0 0 auto;width:44px;border-radius:10px;background:var(--panel-2);border:1px solid var(--line);color:var(--accent);font-size:21px;font-weight:700;line-height:1}
@@ -610,9 +613,9 @@
         </select></label>
       <div class="grid-2">
         <label class="fld"><span class="lbl">תחילת משמרת *</span>
-          <input type="datetime-local" id="asgStart" /></label>
+          <div class="dt-row"><input type="date" id="asgStartD" /><input type="text" id="asgStartT" class="time-inp" placeholder="HH:MM" inputmode="numeric" maxlength="5" /></div></label>
         <label class="fld"><span class="lbl">סיום משוער</span>
-          <input type="datetime-local" id="asgEnd" /></label>
+          <div class="dt-row"><input type="date" id="asgEndD" /><input type="text" id="asgEndT" class="time-inp" placeholder="HH:MM" inputmode="numeric" maxlength="5" /></div></label>
       </div>
       <div class="row" style="gap:8px">
         <button class="btn sm" data-shift="morning">🌅 משמרת בוקר 09:00–15:00</button>
@@ -768,6 +771,30 @@ function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
 function fmtTime(iso){if(!iso)return '—';const d=new Date(iso);return d.toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}
 function fmtTimeShort(iso){if(!iso)return '';const d=new Date(iso);return d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});}
 function localInputValue(d){const x=new Date(d);x.setMinutes(x.getMinutes()-x.getTimezoneOffset());return x.toISOString().slice(0,16);}
+// ----- 24h date+time field helpers (always display HH:MM, no AM/PM) -----
+function normTime(v){
+  v=String(v||'').trim(); if(!v) return '';
+  const p=n=>String(n).padStart(2,'0');
+  let m=v.match(/^(\d{1,2}):(\d{2})$/);
+  if(m) return p(Math.min(23,+m[1]))+':'+p(Math.min(59,+m[2]));
+  const d=v.replace(/\D/g,'');
+  if(d.length<=2) return p(Math.min(23,+d))+':00';
+  if(d.length===3) return p(Math.min(23,+d.slice(0,1)))+':'+p(Math.min(59,+d.slice(1)));
+  return p(Math.min(23,+d.slice(0,2)))+':'+p(Math.min(59,+d.slice(2,4)));
+}
+function dtGet(prefix){
+  const d=$('#'+prefix+'D').value, t=normTime($('#'+prefix+'T').value);
+  if(!d || !t) return null;
+  const m=t.match(/^(\d{2}):(\d{2})$/); if(!m) return null;
+  const dt=new Date(d+'T'+m[1]+':'+m[2]+':00');
+  return isNaN(dt)?null:dt;
+}
+function dtSet(prefix,date){
+  if(!date){ $('#'+prefix+'D').value=''; $('#'+prefix+'T').value=''; return; }
+  const d=new Date(date), p=n=>String(n).padStart(2,'0');
+  $('#'+prefix+'D').value=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+  $('#'+prefix+'T').value=p(d.getHours())+':'+p(d.getMinutes());
+}
 function durationStr(a){
   const s=new Date(a.start_time);const e=a.end_time?new Date(a.end_time):new Date();
   let m=Math.max(0,Math.round((e-s)/60000));const h=Math.floor(m/60);m=m%60;
@@ -1321,8 +1348,8 @@ function openAsg(id){
     fillAsgLocs(a.location);
     aT.innerHTML=`<option>${esc(a.population_type)}</option>`;
     $('#asgTravel').value=a.travel_status||'present';
-    $('#asgStart').value=localInputValue(a.start_time);
-    $('#asgEnd').value=a.end_time?localInputValue(a.end_time):'';
+    dtSet('asgStart', a.start_time);
+    dtSet('asgEnd', a.end_time||null);
     $('#asgDelete').style.display='';
   }else{
     $('#asgTitle').textContent='שיבוץ חדש';
@@ -1330,9 +1357,9 @@ function openAsg(id){
     aT.innerHTML='<option>—</option>';
     $('#asgTravel').value='present';
     const now=new Date();
-    $('#asgStart').value=localInputValue(now);
+    dtSet('asgStart', now);
     const de=new Date(now); de.setHours(21,0,0,0);            // ברירת מחדל: עד 21:00
-    $('#asgEnd').value = de>now ? localInputValue(de) : '';
+    dtSet('asgEnd', de>now ? de : null);
     $('#asgDelete').style.display='none';
   }
   syncType();
@@ -1349,15 +1376,15 @@ async function saveAsg(){
   const full_name=$('#asgPerson').value.trim();
   const population_type=$('#asgType').value.trim();
   const location=$('#asgLoc').value.trim();
-  const sv=$('#asgStart').value, ev=$('#asgEnd').value;
+  const sd=dtGet('asgStart'), ed=dtGet('asgEnd');
   const travel=$('#asgTravel').value;
   if(!full_name){toast('בחר שם','err');return;}
   if(!location && travel!=='oncall'){toast('בחר מיקום','err');return;}
-  if(!sv){toast('הזן זמן התחלה','err');return;}
-  if(ev && new Date(ev)<=new Date(sv)){toast('זמן הסיום חייב להיות אחרי ההתחלה','err');return;}
+  if(!sd){toast('הזן תאריך ושעת התחלה','err');return;}
+  if(ed && ed<=sd){toast('זמן הסיום חייב להיות אחרי ההתחלה','err');return;}
   const rec={full_name,population_type:population_type==='—'?'סדיר':population_type,location,
     travel_status:travel,
-    start_time:new Date(sv).toISOString(), end_time:ev?new Date(ev).toISOString():null};
+    start_time:sd.toISOString(), end_time:ed?ed.toISOString():null};
   try{
     if(editingId)await Data.updateAsg(editingId,rec);
     else await Data.addAsg(rec);
@@ -1628,25 +1655,27 @@ function bind(){
   $('#ilName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#ilSave').click();}});
   $$('[data-dur]').forEach(b=>b.onclick=()=>{
     const h=+b.dataset.dur;
-    const sv=$('#asgStart').value||localInputValue(new Date());
-    if(!$('#asgStart').value)$('#asgStart').value=sv;
-    if(h===0){$('#asgEnd').value='';}
-    else{const e=new Date(sv);e.setHours(e.getHours()+h);$('#asgEnd').value=localInputValue(e);}
+    let s=dtGet('asgStart'); if(!s){s=new Date(); dtSet('asgStart',s);}
+    if(h===0){dtSet('asgEnd',null);}
+    else{const e=new Date(s); e.setHours(e.getHours()+h); dtSet('asgEnd',e);}
   });
   $$('[data-shift]').forEach(b=>b.onclick=()=>{
     const sh=SHIFTS.find(s=>s.key===b.dataset.shift);if(!sh)return;
-    const base=$('#asgStart').value?new Date($('#asgStart').value):new Date();
+    const base=dtGet('asgStart')||new Date();
     const w=shiftWindow(sh,base);
-    $('#asgStart').value=localInputValue(w.start);
-    $('#asgEnd').value=localInputValue(w.end);
+    dtSet('asgStart',w.start); dtSet('asgEnd',w.end);
   });
   $$('[data-until]').forEach(b=>b.onclick=()=>{
     const [h,m]=b.dataset.until.split(':').map(Number);
-    const base=$('#asgStart').value?new Date($('#asgStart').value):new Date();
-    if(!$('#asgStart').value)$('#asgStart').value=localInputValue(base);
+    let base=dtGet('asgStart'); if(!base){base=new Date(); dtSet('asgStart',base);}
     const e=new Date(base); e.setHours(h,m,0,0);
     if(e<=base) e.setDate(e.getDate()+1);
-    $('#asgEnd').value=localInputValue(e);
+    dtSet('asgEnd',e);
+  });
+  // normalize time fields on blur → always HH:MM (24h)
+  ['asgStartT','asgEndT'].forEach(id=>{
+    const inp=$('#'+id);
+    inp.addEventListener('blur',()=>{ inp.value=normTime(inp.value); });
   });
 
   // auth gate
