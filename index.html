@@ -297,8 +297,9 @@
   .empty-state .big{font-size:15px;color:var(--txt-dim);margin-bottom:6px;font-weight:600}
 
   /* ===== Planning / Gantt ===== */
-  .gantt-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:auto}
-  .gantt{min-width:900px}
+  .gantt-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:auto;-webkit-overflow-scrolling:touch}
+  .gantt{width:max-content;min-width:100%;--locW:190px}
+  .gantt-head,.gantt-row{grid-template-columns:var(--locW) repeat(7,minmax(120px,1fr))}
   .gantt-head{display:grid;border-bottom:1px solid var(--line);background:var(--bg-2);position:sticky;top:0;z-index:2}
   .gantt-row{display:grid;border-bottom:1px solid var(--line-soft);min-height:54px}
   .gantt-row:last-child{border-bottom:none}
@@ -322,6 +323,15 @@
   .cov-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--txt-dim);margin-top:12px}
   .cov-legend span{display:flex;align-items:center;gap:6px}
   .cov-legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+  @media(max-width:640px){
+    .gantt{--locW:84px}
+    .gantt-head,.gantt-row{grid-template-columns:var(--locW) repeat(7,minmax(100px,1fr))}
+    .g-loc{padding:9px 6px;font-size:11px;gap:4px}
+    .g-loc .loc-dot{width:8px;height:8px;flex:0 0 auto}
+    .g-day{padding:8px 3px;font-size:11px}
+    .g-name{font-size:9.5px;padding:1px 4px}
+    .g-shift{padding:2px 4px;gap:3px}
+  }
 
   /* ===== Management ===== */
   .mgr-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:18px}
@@ -1155,10 +1165,8 @@ function renderPlanning(){
   $('#planRange').textContent =
     days[0].toLocaleDateString('he-IL',{day:'numeric',month:'long'})+' – '+
     days[6].toLocaleDateString('he-IL',{day:'numeric',month:'long',year:'numeric'});
-  const colTmpl = '200px repeat(7,1fr)';
-
   // header
-  const head=el('div','gantt-head');head.style.gridTemplateColumns=colTmpl;
+  const head=el('div','gantt-head');
   head.appendChild(el('div','g-loc','מיקום \\ יום'));
   const todayStr=new Date().toDateString();
   days.forEach(d=>{
@@ -1175,7 +1183,7 @@ function renderPlanning(){
     return;
   }
   locs.forEach(loc=>{
-    const row=el('div','gantt-row');row.style.gridTemplateColumns=colTmpl;
+    const row=el('div','gantt-row');
     row.appendChild(el('div','g-loc',`<span class="loc-dot" style="background:var(--accent)"></span>${esc(loc)}`));
     days.forEach(d=>{
       const isToday=d.toDateString()===todayStr;
