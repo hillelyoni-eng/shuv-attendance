@@ -236,6 +236,16 @@
   .cmdbar input{border:1px solid var(--line);background:var(--bg-2)}
   .cmd-hint{font-size:12px;color:var(--txt-faint);margin:9px 2px 18px;line-height:1.6}
   .cmd-hint b{color:var(--txt-dim);font-weight:600}
+  .shift-tag{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--txt-dim);background:var(--panel-2);border:1px solid var(--line-soft);padding:1px 6px;border-radius:5px;white-space:nowrap}
+  .shift-now{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-dim);border-radius:999px;padding:7px 15px;margin-bottom:16px}
+  .shift-now.off{color:var(--txt-faint);background:var(--panel);border-color:var(--line)}
+  /* shift blocks in gantt */
+  .g-shift{display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding:3px 5px;border-radius:6px;background:rgba(45,212,191,.06);border:1px solid rgba(45,212,191,.15);min-height:23px}
+  .g-shift.gap{background:rgba(239,93,93,.07);border:1px dashed rgba(239,93,93,.4);color:var(--danger);font-size:10px;font-weight:600;justify-content:center}
+  .g-shift-ic{font-size:11px;opacity:.85}
+  .g-name{font-size:10px;font-weight:600;background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:4px;cursor:pointer}
+  .g-name:hover{filter:brightness(1.15)}
+  .g-more{font-size:10px;color:var(--txt-faint)}
 
   /* ===== Mobile ===== */
   @media(max-width:860px){
@@ -444,7 +454,8 @@
       <div class="cmd-wrap"><input id="cmdInput" placeholder="כתוב פקודה חופשית… לדוגמה: רוסלן בדרך לבסיס צדי · סאסי הגיע לתיבת נוח · יוני יצא הביתה 14:30" /></div>
       <button class="btn primary" id="cmdRun">בצע</button>
     </div>
-    <div class="cmd-hint">המערכת מזהה לבד: <b>בדרך ל…</b> = בנסיעה · <b>הגיע ל…</b> = נוכח · <b>בשמירות / נמצא ב…</b> = נוכח · <b>כונן ענפי</b> · <b>יצא הביתה</b> = סיום נוכחות. אפשר להוסיף שעה לעדכון בדיעבד (לדוגמה <b>14:30</b>).</div>
+    <div class="cmd-hint">המערכת מזהה לבד: <b>בדרך ל…</b> = בנסיעה · <b>הגיע ל…</b> = נוכח · <b>כונן ענפי</b> · <b>יצא הביתה</b> = סיום · <b>משמרת בוקר / ערב</b> = קובע זמנים. אפשר להוסיף שעה לעדכון בדיעבד (<b>14:30</b>).</div>
+    <div id="shiftNow"></div>
     <div class="stats" id="dashStats"></div>
     <div class="row" style="margin-bottom:18px">
       <div class="search">
@@ -460,7 +471,7 @@
   <section class="view" id="view-plan">
     <div class="section-title">
       <h2>תכנון משמרות</h2>
-      <span class="hint">תצוגת שבוע · חיווי פערי כיסוי במיקומים</span>
+      <span class="hint">תצוגת שבוע · כיסוי לפי משמרת (בוקר/ערב) · חיווי פערים</span>
     </div>
     <div class="row" style="margin-bottom:16px">
       <button class="btn sm" id="planPrev">‹ שבוע קודם</button>
@@ -471,8 +482,9 @@
     </div>
     <div class="gantt-wrap"><div class="gantt" id="gantt"></div></div>
     <div class="cov-legend">
-      <span><i style="background:var(--accent-soft);border:1px solid rgba(45,212,191,.3)"></i> שיבוץ קיים</span>
-      <span><i style="background:rgba(239,93,93,.1);border:1px dashed rgba(239,93,93,.5)"></i> פער כיסוי (אין נוכחות)</span>
+      <span>🌅 משמרת בוקר 09:00–15:00</span>
+      <span>🌆 משמרת ערב 15:00–21:00</span>
+      <span><i style="background:rgba(239,93,93,.1);border:1px dashed rgba(239,93,93,.5)"></i> פער כיסוי במשמרת</span>
       <span><i style="background:var(--accent-soft)"></i> היום</span>
     </div>
   </section>
@@ -501,7 +513,7 @@
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th>שם מלא</th><th>אוכלוסייה</th><th>מיקום</th><th>התחלה</th><th>סיום</th><th>משך</th><th>סטטוס</th><th></th>
+          <th>שם מלא</th><th>אוכלוסייה</th><th>מיקום</th><th>התחלה</th><th>סיום</th><th>משך</th><th>משמרת</th><th>סטטוס</th><th></th>
         </tr></thead>
         <tbody id="archBody"></tbody>
       </table>
@@ -603,12 +615,16 @@
           <input type="datetime-local" id="asgEnd" /></label>
       </div>
       <div class="row" style="gap:8px">
-        <button class="btn sm" data-dur="4">+4 שעות</button>
-        <button class="btn sm" data-dur="12">משמרת 12ש'</button>
-        <button class="btn sm" data-dur="24">משמרת 24ש'</button>
-        <button class="btn sm" data-dur="0">פתוח (ללא סיום)</button>
+        <button class="btn sm" data-shift="morning">🌅 משמרת בוקר 09:00–15:00</button>
+        <button class="btn sm" data-shift="evening">🌆 משמרת ערב 15:00–21:00</button>
       </div>
-      <div class="form-note">הזמנים נקבעים אוטומטית מרגע התחלת המשמרת. ניתן לתקן ידנית.</div>
+      <div class="row" style="gap:8px">
+        <button class="btn sm" data-dur="4">+4 שעות</button>
+        <button class="btn sm" data-dur="12">12ש'</button>
+        <button class="btn sm" data-dur="24">24ש'</button>
+        <button class="btn sm" data-dur="0">פתוח</button>
+      </div>
+      <div class="form-note">בחר משמרת קבועה או הגדר זמנים ידנית.</div>
     </div>
     <div class="modal-foot">
       <button class="btn primary" id="asgSave">שמור שיבוץ</button>
@@ -681,6 +697,10 @@
 
 /* ---------- constants ---------- */
 const POP_CLASS = {'סדיר':'saddir','מילואים':'miluim','יועץ':'yoetz'};
+const SHIFTS = [
+  {key:'morning', label:'משמרת בוקר', ic:'🌅', start:'09:00', end:'15:00'},
+  {key:'evening', label:'משמרת ערב',  ic:'🌆', start:'15:00', end:'21:00'},
+];
 const LS = {cfg:'shuv_cfg', ppl:'shuv_ppl', loc:'shuv_loc', asg:'shuv_asg'};
 // ----- Built-in cloud connection (auto-connect on load) -----
 // Safe to embed: with auth-gated RLS + allowlist, this key alone grants nothing.
@@ -750,6 +770,22 @@ function durationStr(a){
   const s=new Date(a.start_time);const e=a.end_time?new Date(a.end_time):new Date();
   let m=Math.max(0,Math.round((e-s)/60000));const h=Math.floor(m/60);m=m%60;
   return (h?h+'ש\' ':'')+(m?m+'ד\'':(h?'':'0ד\''));
+}
+function hm(d){d=new Date(d);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function shiftWindow(sh,day){
+  const [h1,m1]=sh.start.split(':').map(Number),[h2,m2]=sh.end.split(':').map(Number);
+  const s=new Date(day);s.setHours(h1,m1,0,0);
+  const e=new Date(day);e.setHours(h2,m2,0,0);
+  return {start:s,end:e};
+}
+function shiftOf(a){            // identify the named shift from start+end times
+  if(!a.start_time||!a.end_time)return null;
+  const ss=hm(a.start_time),es=hm(a.end_time);
+  return SHIFTS.find(x=>x.start===ss && x.end===es)||null;
+}
+function currentShift(){
+  const now=hm(new Date());
+  return SHIFTS.find(x=>now>=x.start && now<x.end)||null;
 }
 function status(a){
   const now=Date.now();const s=new Date(a.start_time).getTime();
@@ -965,6 +1001,12 @@ function renderDashboard(){
   const live = state.assignments.filter(a=>status(a)==='live');
   $('#tabDashCnt').textContent = live.length;
 
+  // current-shift banner
+  const cs=currentShift();
+  const sn=$('#shiftNow');
+  if(cs){ sn.className='shift-now'; sn.innerHTML=`${cs.ic} כעת: <b style="margin-inline-start:3px">${cs.label}</b> · ${cs.start}–${cs.end}`; }
+  else { sn.className='shift-now off'; sn.innerHTML='🕐 מחוץ לשעות המשמרות הקבועות'; }
+
   // stats
   const oncallPpl = live.filter(a=>a.travel_status==='oncall');
   const present = live.filter(a=>a.travel_status!=='enroute' && a.travel_status!=='oncall');
@@ -1045,10 +1087,12 @@ function personCard(a){
   const avatar = enroute?'🚗':oncall?'🔔':esc(initials(a.full_name));
   const badge = enroute?'<span class="travel-badge">🚗 בנסיעה</span>'
               : oncall?'<span class="oncall-badge">🔔 כונן ענפי</span>':'';
+  const sh=shiftOf(a);
+  const shTag = sh?` <span class="shift-tag">${sh.ic} ${sh.label}</span>`:'';
   let meta;
   if(enroute) meta=`<span class="time" style="color:var(--warn)">🚗 בדרך אל ${esc(a.location)}</span>`;
   else if(oncall) meta=`<span class="time" style="color:var(--pop-miluim)">🔔 כונן ${a.location?'· בסיס '+esc(a.location):'· זמין'}</span>`;
-  else meta=`<span>⏱️ מ‑${fmtTimeShort(a.start_time)}</span><span class="time ${timeCls}">· ${endTxt}</span>`;
+  else meta=`<span>⏱️ מ‑${fmtTimeShort(a.start_time)}</span><span class="time ${timeCls}">· ${endTxt}</span>${shTag}`;
   c.innerHTML=`
     <div class="pc-top">
       <div class="av">${avatar}</div>
@@ -1103,27 +1147,34 @@ function renderPlanning(){
     const row=el('div','gantt-row');row.style.gridTemplateColumns=colTmpl;
     row.appendChild(el('div','g-loc',`<span class="loc-dot" style="background:var(--accent)"></span>${esc(loc)}`));
     days.forEach(d=>{
-      const ds=new Date(d);ds.setHours(0,0,0,0);
-      const de=addDays(ds,1);
       const isToday=d.toDateString()===todayStr;
       const cell=el('div','g-cell'+(isToday?' today':''));
-      // assignments overlapping this day & location
-      const items=state.assignments.filter(a=>{
-        if(a.location!==loc)return false;
-        const s=new Date(a.start_time),e=a.end_time?new Date(a.end_time):new Date(8.64e15);
-        return s<de && e>=ds;
-      });
-      if(items.length===0){
-        cell.appendChild(el('div','g-chip gap','— פער —'));
-      }else{
-        items.slice(0,6).forEach(a=>{
-          const chip=el('div','g-chip',`${esc(a.full_name.split(' ')[0])} · ${fmtTimeShort(a.start_time)}`);
-          chip.title=`${a.full_name} (${a.population_type})\n${fmtTime(a.start_time)} → ${a.end_time?fmtTime(a.end_time):'פתוח'}`;
-          chip.onclick=()=>openAsg(a.id);
-          cell.appendChild(chip);
+      // one block per shift — coverage indicator
+      SHIFTS.forEach(sh=>{
+        const w=shiftWindow(sh,d);
+        const items=state.assignments.filter(a=>{
+          if(a.location!==loc)return false;
+          if(a.travel_status==='oncall')return false; // roving — not pinned to a shift
+          const s=new Date(a.start_time),e=a.end_time?new Date(a.end_time):new Date(8.64e15);
+          return s<w.end && e>w.start;
         });
-        if(items.length>6)cell.appendChild(el('div','g-chip',`+${items.length-6} נוספים`));
-      }
+        const block=el('div','g-shift');
+        if(items.length===0){
+          block.classList.add('gap');
+          block.innerHTML=`<span class="g-shift-ic">${sh.ic}</span><span>פער</span>`;
+          block.title=sh.label+' — אין כיסוי';
+        }else{
+          block.appendChild(el('span','g-shift-ic',sh.ic));
+          items.slice(0,3).forEach(a=>{
+            const n=el('span','g-name',esc(a.full_name.split(' ')[0]));
+            n.title=`${a.full_name} (${a.population_type}) · ${sh.label}`;
+            n.onclick=()=>openAsg(a.id);
+            block.appendChild(n);
+          });
+          if(items.length>3)block.appendChild(el('span','g-more',`+${items.length-3}`));
+        }
+        cell.appendChild(block);
+      });
       row.appendChild(cell);
     });
     g.appendChild(row);
@@ -1155,7 +1206,7 @@ function renderArchive(){
 
   const tb=$('#archBody');tb.innerHTML='';
   if(rows.length===0){
-    tb.innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="big">אין רשומות תואמות</div>נסה לשנות את הסינון</div></td></tr>';
+    tb.innerHTML='<tr><td colspan="9"><div class="empty-state"><div class="big">אין רשומות תואמות</div>נסה לשנות את הסינון</div></td></tr>';
     return;
   }
   const stLbl={live:'נוכח כעת',future:'מתוכנן',past:'הסתיים'};
@@ -1172,6 +1223,7 @@ function renderArchive(){
        <td style="font-variant-numeric:tabular-nums;color:var(--txt-dim)">${fmtTime(a.start_time)}</td>
        <td style="font-variant-numeric:tabular-nums;color:var(--txt-dim)">${a.end_time?fmtTime(a.end_time):'<span style="color:var(--txt-faint)">פתוח</span>'}</td>
        <td style="color:var(--txt-dim)">${durationStr(a)}</td>
+       <td style="color:var(--txt-dim);white-space:nowrap">${(()=>{const sh=shiftOf(a);return sh?sh.ic+' '+sh.label:'<span style="color:var(--txt-faint)">מותאם</span>';})()}</td>
        <td><span class="status-pill ${stCls}">${stTxt}</span></td>
        <td><button class="btn ghost sm edit">עריכה</button></td>`);
     tr.querySelector('.edit').onclick=()=>openAsg(a.id);
@@ -1367,6 +1419,9 @@ async function runCommand(raw){
   const when=cmdParseTime(text);
   const locs=cmdFindLocations(text);
   const lastLoc = locs.length?locs[locs.length-1].name:null;
+  let shift=null;
+  if(/משמרת בוקר|\bבוקר/.test(text)) shift=SHIFTS[0];
+  else if(/משמרת ערב|\bערב/.test(text)) shift=SHIFTS[1];
   const hasEnroute=/בדרך|בנסיעה|נוסע|בדרכו|מפנה/.test(text);
   const hasHome=/הביתה|לבית|שוחרר|השתחרר|סיים|עזב/.test(text);
   const hasOncall=/כונן/.test(text);
@@ -1379,10 +1434,13 @@ async function runCommand(raw){
   else if(lastLoc){action='present';location=lastLoc;}
   else {toast('לא הובן מה לעדכן עבור '+person.full_name+'. נסה: "בדרך ל…", "הגיע ל…", "יצא הביתה".','err');return;}
   if((action==='enroute'||action==='present') && !location){toast('לא זוהה מיקום מוכר בפקודה.','err');return;}
-  await executeCommand(person,action,location,when);
+  await executeCommand(person,action,location,when,shift);
 }
-async function executeCommand(person,action,location,when){
+async function executeCommand(person,action,location,when,shift){
   const ts=when.toISOString();
+  let st=ts, et=null;
+  if(shift){ const w=shiftWindow(shift,new Date()); st=w.start.toISOString(); et=w.end.toISOString(); }
+  const shTxt = shift?' · '+shift.ic+' '+shift.label:'';
   const open=state.assignments.find(a=>a.full_name===person.full_name && status(a)==='live');
   try{
     if(action==='left'){
@@ -1390,18 +1448,20 @@ async function executeCommand(person,action,location,when){
       else{toast(person.full_name+' לא נמצא/ת כרגע בשיבוץ פעיל','err');}
       return;
     }
-    if(action==='present' && open && open.location===location && open.travel_status!=='present'){
-      await Data.updateAsg(open.id,{travel_status:'present'});
-      toast('✓ '+person.full_name+' — הגיע/ה ל'+location+' ('+fmtTimeShort(ts)+')','ok');
+    if(action==='present' && open && open.location===location){
+      const patch={travel_status:'present'};
+      if(shift){patch.start_time=st;patch.end_time=et;}
+      await Data.updateAsg(open.id,patch);
+      toast('✓ '+person.full_name+' — הגיע/ה ל'+location+shTxt,'ok');
       return;
     }
     if(open) await Data.updateAsg(open.id,{end_time:ts});
-    const rec={full_name:person.full_name,population_type:person.population_type,location:location||'',travel_status:action,start_time:ts,end_time:null};
+    const rec={full_name:person.full_name,population_type:person.population_type,location:location||'',travel_status:action,start_time:st,end_time:et};
     await Data.addAsg(rec);
     const lbl = action==='enroute'?'בדרך ל'+location
               : action==='oncall'?'כונן ענפי'+(location?' (בסיס '+location+')':'')
               : 'נוכח/ת ב'+location;
-    toast('✓ '+person.full_name+' — '+lbl+' ('+fmtTimeShort(ts)+')','ok');
+    toast('✓ '+person.full_name+' — '+lbl+shTxt+' ('+fmtTimeShort(st)+')','ok');
   }catch(e){toast('שגיאה: '+e.message,'err');}
 }
 
@@ -1567,6 +1627,13 @@ function bind(){
     if(h===0){$('#asgEnd').value='';}
     else{const e=new Date(sv);e.setHours(e.getHours()+h);$('#asgEnd').value=localInputValue(e);}
   });
+  $$('[data-shift]').forEach(b=>b.onclick=()=>{
+    const sh=SHIFTS.find(s=>s.key===b.dataset.shift);if(!sh)return;
+    const base=$('#asgStart').value?new Date($('#asgStart').value):new Date();
+    const w=shiftWindow(sh,base);
+    $('#asgStart').value=localInputValue(w.start);
+    $('#asgEnd').value=localInputValue(w.end);
+  });
 
   // auth gate
   $('#googleBtn').onclick=googleSignIn;
@@ -1613,14 +1680,15 @@ function exportCSV(){
     if(fp&&a.full_name!==fp)return false;if(fl&&a.location!==fl)return false;
     const s=new Date(a.start_time);if(ff&&s<ff)return false;if(ft&&s>ft)return false;return true;
   }).sort((a,b)=>new Date(b.start_time)-new Date(a.start_time));
-  const hdr=['שם מלא','אוכלוסייה','מיקום','התחלה','סיום','משך','סטטוס'];
+  const hdr=['שם מלא','אוכלוסייה','מיקום','התחלה','סיום','משך','משמרת','סטטוס'];
   const stLbl={live:'נוכח',future:'מתוכנן',past:'הסתיים'};
   const lines=[hdr.join(',')].concat(rows.map(a=>{
     const st=status(a);
     const stTxt=(st==='live'&&a.travel_status==='enroute')?'בנסיעה':(st==='live'&&a.travel_status==='oncall')?'כונן ענפי':stLbl[st];
+    const sh=shiftOf(a);
     return [
       a.full_name,a.population_type,a.location,fmtTime(a.start_time),
-      a.end_time?fmtTime(a.end_time):'פתוח',durationStr(a),stTxt
+      a.end_time?fmtTime(a.end_time):'פתוח',durationStr(a),sh?sh.label:'מותאם',stTxt
     ].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',');
   }));
   download('shuv-archive-'+Date.now()+'.csv','﻿'+lines.join('\n'),'text/csv');
