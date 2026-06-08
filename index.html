@@ -481,6 +481,7 @@
       <button class="btn sm" id="planPrev">‹ שבוע קודם</button>
       <button class="btn sm" id="planToday">היום</button>
       <button class="btn sm" id="planNext">שבוע הבא ›</button>
+      <button class="btn primary sm" id="exportWeek">📸 ייצוא שבוע</button>
       <span class="spacer"></span>
       <span class="hint" id="planRange"></span>
     </div>
@@ -1583,6 +1584,7 @@ function bind(){
   $('#planPrev').onclick=()=>{planWeekStart=addDays(planWeekStart,-7);renderPlanning();};
   $('#planNext').onclick=()=>{planWeekStart=addDays(planWeekStart,7);renderPlanning();};
   $('#planToday').onclick=()=>{planWeekStart=startOfWeek(new Date());renderPlanning();};
+  $('#exportWeek').addEventListener('click',()=>{ exportWeekImage().catch(e=>toast('שגיאה: '+e.message,'err')); });
 
   // archive filters
   ['#fPerson','#fLoc','#fFrom','#fTo'].forEach(s=>$(s).addEventListener('change',renderArchive));
@@ -1841,6 +1843,97 @@ async function exportStatusImage(){
     setTimeout(()=>URL.revokeObjectURL(url),1500);
     toast('תמונת המצב יוצאה','ok');
   },'image/png');
+}
+function pngOut(canvas,fname,title){
+  canvas.toBlob(async(blob)=>{
+    if(!blob){toast('יצירת התמונה נכשלה','err');return;}
+    const file=new File([blob],fname,{type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file],title}); return; }catch(e){}
+    }
+    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fname;a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+    toast('התמונה יוצאה','ok');
+  },'image/png');
+}
+async function exportWeekImage(){
+  try{ await document.fonts.load('800 30px Rubik'); await document.fonts.load('500 18px Rubik'); }catch(e){}
+  const now=new Date();
+  const days=[...Array(7)].map((_,i)=>addDays(planWeekStart,i));
+  const defined=state.locations.map(l=>l.name);
+  const extra=Array.from(new Set(state.assignments.map(a=>a.location))).filter(n=>n&&!defined.includes(n));
+  const locs=[...defined,...extra].filter(Boolean);
+  if(!locs.length){toast('אין מיקומים להצגה — הגדר מיקומים בניהול','err');return;}
+
+  const padX=44, locW=170, dayW=186, scale=2;
+  const W=padX*2+locW+days.length*dayW;
+  const headerH=150, dayHeadH=64, rowH=92, footerH=52;
+  const H=headerH+dayHeadH+locs.length*rowH+footerH;
+
+  const c=document.createElement('canvas');c.width=W*scale;c.height=H*scale;
+  const ctx=c.getContext('2d');ctx.scale(scale,scale);
+  const rr=(x,y,w,h,r)=>{ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();};
+  ctx.fillStyle='#0c1014';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#2dd4bf';ctx.fillRect(0,0,W,7);
+  ctx.direction='rtl';
+
+  // header
+  ctx.fillStyle='#2dd4bf';rr(W-padX-54,26,54,54,14);ctx.fill();
+  ctx.fillStyle='#06201d';ctx.font='800 30px Rubik, sans-serif';ctx.textAlign='center';ctx.fillText('ש',W-padX-27,63);
+  ctx.textAlign='right';ctx.fillStyle='#e8eef3';ctx.font='700 34px Rubik, sans-serif';
+  ctx.fillText('שו"ב נוכחות — תכנון שבועי',W-padX-70,52);
+  const range=days[0].toLocaleDateString('he-IL',{day:'numeric',month:'long'})+' – '+days[6].toLocaleDateString('he-IL',{day:'numeric',month:'long',year:'numeric'});
+  ctx.fillStyle='#9bb0c0';ctx.font='500 22px Rubik, sans-serif';ctx.fillText(range,W-padX-70,87);
+
+  const locX=W-padX-locW;
+  const dayLeft=i=>locX-(i+1)*dayW;
+  const dayCx=i=>locX-(i+0.5)*dayW;
+  const todayStr=now.toDateString();
+
+  // day header
+  let y=headerH;
+  ctx.textAlign='center';ctx.fillStyle='#65788a';ctx.font='600 18px Rubik, sans-serif';
+  ctx.fillText('מיקום',locX+locW/2,y+38);
+  days.forEach((d,i)=>{
+    const isToday=d.toDateString()===todayStr;
+    if(isToday){ctx.fillStyle='rgba(45,212,191,.13)';rr(dayLeft(i)+3,y+6,dayW-6,dayHeadH-10,8);ctx.fill();}
+    ctx.fillStyle=isToday?'#2dd4bf':'#e8eef3';ctx.font='700 20px Rubik, sans-serif';ctx.textAlign='center';
+    ctx.fillText(d.toLocaleDateString('he-IL',{weekday:'long'}),dayCx(i),y+31);
+    ctx.fillStyle='#65788a';ctx.font='500 16px Rubik, sans-serif';
+    ctx.fillText(d.getDate()+'/'+(d.getMonth()+1),dayCx(i),y+52);
+  });
+  y+=dayHeadH;
+
+  const cover=(loc,day,sh)=>{const w=shiftWindow(sh,day);return state.assignments.filter(a=>a.location===loc&&a.travel_status!=='oncall'&&new Date(a.start_time)<w.end&&(a.end_time?new Date(a.end_time):new Date(8.64e15))>w.start).map(a=>a.full_name.split(' ')[0]);};
+  const fit=(names,maxW)=>{let sh=names.slice();while(sh.length){const ex=names.length-sh.length;const s=sh.join(', ')+(ex?' +'+ex:'');if(ctx.measureText(s).width<=maxW||sh.length===1)return s;sh.pop();}return names[0];};
+
+  locs.forEach((loc,ri)=>{
+    const ry=y+ri*rowH;
+    if(ri%2===0){ctx.fillStyle='rgba(255,255,255,.02)';ctx.fillRect(padX,ry,W-padX*2,rowH);}
+    ctx.textAlign='center';ctx.fillStyle='#e8eef3';ctx.font='700 21px Rubik, sans-serif';
+    ctx.fillText(loc.length>14?loc.slice(0,13)+'…':loc,locX+locW/2,ry+rowH/2+7);
+    days.forEach((d,i)=>{
+      const cl=dayLeft(i), rightX=cl+dayW-12, maxW=dayW-24;
+      SHIFTS.forEach((shf,si)=>{
+        const names=cover(loc,d,shf);
+        const ly=ry+(si===0?34:66);
+        ctx.textAlign='right';ctx.font='600 17px Rubik, sans-serif';
+        if(!names.length){ ctx.fillStyle='#ef5d5d'; ctx.fillText(shf.ic+' פער',rightX,ly); }
+        else{ ctx.fillStyle=si===0?'#e8eef3':'#aebfcb'; ctx.fillText(shf.ic+' '+fit(names,maxW-26),rightX,ly); }
+      });
+    });
+    ctx.strokeStyle='#202b34';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(padX,ry+rowH);ctx.lineTo(W-padX,ry+rowH);ctx.stroke();
+  });
+  // vertical separators
+  ctx.strokeStyle='#202b34';ctx.lineWidth=1;
+  for(let i=0;i<=days.length;i++){const x=locX-i*dayW;ctx.beginPath();ctx.moveTo(x,headerH);ctx.lineTo(x,y+locs.length*rowH);ctx.stroke();}
+
+  // footer
+  const fy=y+locs.length*rowH;
+  ctx.textAlign='center';ctx.fillStyle='#65788a';ctx.font='400 17px Rubik, sans-serif';
+  ctx.fillText('🌅 בוקר 09:00–15:00   ·   🌆 ערב 15:00–21:00   ·   הופק '+now.toLocaleString('he-IL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}),W/2,fy+32);
+
+  pngOut(c,'week-'+days[0].toISOString().slice(0,10)+'.png','תכנון שבועי');
 }
 function download(name,content,type){
   const blob=new Blob([content],{type:type||'application/json'});
