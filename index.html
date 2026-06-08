@@ -382,7 +382,8 @@
   .modal-foot{padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-start}
   .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .dt-row{display:flex;gap:8px}
-  .dt-row input[type=date]{flex:1;min-width:0}
+  .dt-row .date-inp{flex:1;min-width:0}
+  .date-inp{text-align:center;font-variant-numeric:tabular-nums;letter-spacing:.5px;font-weight:600}
   .time-inp{flex:0 0 86px;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:1.5px;font-weight:600}
   .sel-add{display:flex;gap:8px}
   .sel-add select{flex:1}
@@ -534,9 +535,9 @@
         <label class="fld" style="flex:1;min-width:160px"><span class="lbl">סינון לפי מיקום</span>
           <select id="fLoc"><option value="">— כל המיקומים —</option></select></label>
         <label class="fld" style="flex:1;min-width:130px"><span class="lbl">מתאריך</span>
-          <input type="date" id="fFrom" /></label>
+          <input type="text" id="fFrom" class="date-inp" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" /></label>
         <label class="fld" style="flex:1;min-width:130px"><span class="lbl">עד תאריך</span>
-          <input type="date" id="fTo" /></label>
+          <input type="text" id="fTo" class="date-inp" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" /></label>
         <button class="btn ghost sm" id="fClear" style="align-self:flex-end">נקה</button>
         <button class="btn sm" id="fExport" style="align-self:flex-end">⬇ ייצוא CSV</button>
       </div>
@@ -642,9 +643,9 @@
         </select></label>
       <div class="grid-2">
         <label class="fld"><span class="lbl">תחילת משמרת *</span>
-          <div class="dt-row"><input type="date" id="asgStartD" /><input type="text" id="asgStartT" class="time-inp" placeholder="HH:MM" inputmode="numeric" maxlength="5" /></div></label>
+          <div class="dt-row"><input type="text" id="asgStartD" class="date-inp" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" /><input type="text" id="asgStartT" class="time-inp" placeholder="HH:MM" inputmode="numeric" maxlength="5" /></div></label>
         <label class="fld"><span class="lbl">סיום משוער</span>
-          <div class="dt-row"><input type="date" id="asgEndD" /><input type="text" id="asgEndT" class="time-inp" placeholder="HH:MM" inputmode="numeric" maxlength="5" /></div></label>
+          <div class="dt-row"><input type="text" id="asgEndD" class="date-inp" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" /><input type="text" id="asgEndT" class="time-inp" placeholder="HH:MM" inputmode="numeric" maxlength="5" /></div></label>
       </div>
       <div class="row" style="gap:8px">
         <button class="btn sm" data-shift="morning">🌅 משמרת בוקר 09:00–15:00</button>
@@ -813,17 +814,34 @@ function normTime(v){
   if(d.length===3) return p(Math.min(23,+d.slice(0,1)))+':'+p(Math.min(59,+d.slice(1)));
   return p(Math.min(23,+d.slice(0,2)))+':'+p(Math.min(59,+d.slice(2,4)));
 }
+function normDate(v){
+  v=String(v||'').trim(); if(!v) return '';
+  const p=n=>String(n).padStart(2,'0');
+  let m=v.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+  if(m){let d=+m[1],mo=+m[2],y=+m[3]; if(y<100)y+=2000; if(d>=1&&d<=31&&mo>=1&&mo<=12) return p(d)+'/'+p(mo)+'/'+y; return v;}
+  let m2=v.match(/^(\d{1,2})[\/.\-](\d{1,2})$/);
+  if(m2){let d=+m2[1],mo=+m2[2]; if(d>=1&&d<=31&&mo>=1&&mo<=12) return p(d)+'/'+p(mo)+'/'+new Date().getFullYear();}
+  const dg=v.replace(/\D/g,'');
+  if(dg.length===8) return p(+dg.slice(0,2))+'/'+p(+dg.slice(2,4))+'/'+(+dg.slice(4));
+  if(dg.length===6) return p(+dg.slice(0,2))+'/'+p(+dg.slice(2,4))+'/'+(2000+ +dg.slice(4));
+  if(dg.length===4) return p(+dg.slice(0,2))+'/'+p(+dg.slice(2,4))+'/'+new Date().getFullYear();
+  return v;
+}
+function parseDateStr(v){
+  const n=normDate(v); const m=n.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(!m) return null;
+  return {d:+m[1],mo:+m[2],y:+m[3]};
+}
 function dtGet(prefix){
-  const d=$('#'+prefix+'D').value, t=normTime($('#'+prefix+'T').value);
-  if(!d || !t) return null;
+  const dp=parseDateStr($('#'+prefix+'D').value), t=normTime($('#'+prefix+'T').value);
+  if(!dp || !t) return null;
   const m=t.match(/^(\d{2}):(\d{2})$/); if(!m) return null;
-  const dt=new Date(d+'T'+m[1]+':'+m[2]+':00');
+  const dt=new Date(dp.y,dp.mo-1,dp.d,+m[1],+m[2],0);
   return isNaN(dt)?null:dt;
 }
 function dtSet(prefix,date){
   if(!date){ $('#'+prefix+'D').value=''; $('#'+prefix+'T').value=''; return; }
   const d=new Date(date), p=n=>String(n).padStart(2,'0');
-  $('#'+prefix+'D').value=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+  $('#'+prefix+'D').value=p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear();
   $('#'+prefix+'T').value=p(d.getHours())+':'+p(d.getMinutes());
 }
 function durationStr(a){
@@ -1258,8 +1276,9 @@ function renderPlanning(){
 /* ----- Archive ----- */
 function renderArchive(){
   const fp=$('#fPerson').value, fl=$('#fLoc').value;
-  const ff=$('#fFrom').value?new Date($('#fFrom').value+'T00:00'):null;
-  const ft=$('#fTo').value?new Date($('#fTo').value+'T23:59'):null;
+  const ffp=parseDateStr($('#fFrom').value), ftp=parseDateStr($('#fTo').value);
+  const ff=ffp?new Date(ffp.y,ffp.mo-1,ffp.d,0,0):null;
+  const ft=ftp?new Date(ftp.y,ftp.mo-1,ftp.d,23,59):null;
   let rows = state.assignments.slice().sort((a,b)=>new Date(b.start_time)-new Date(a.start_time));
   rows = rows.filter(a=>{
     if(fp && a.full_name!==fp)return false;
@@ -1742,10 +1761,14 @@ function bind(){
     if(e<=base) e.setDate(e.getDate()+1);
     dtSet('asgEnd',e);
   });
-  // normalize time fields on blur → always HH:MM (24h)
+  // normalize time/date fields on blur → 24h HH:MM and dd/mm/yyyy
   ['asgStartT','asgEndT'].forEach(id=>{
     const inp=$('#'+id);
     inp.addEventListener('blur',()=>{ inp.value=normTime(inp.value); });
+  });
+  ['asgStartD','asgEndD','fFrom','fTo'].forEach(id=>{
+    const inp=$('#'+id);
+    inp.addEventListener('blur',()=>{ inp.value=normDate(inp.value); });
   });
 
   // auth gate
@@ -1787,8 +1810,9 @@ function openCloud(){
 
 function exportCSV(){
   const fp=$('#fPerson').value, fl=$('#fLoc').value;
-  const ff=$('#fFrom').value?new Date($('#fFrom').value+'T00:00'):null;
-  const ft=$('#fTo').value?new Date($('#fTo').value+'T23:59'):null;
+  const ffp=parseDateStr($('#fFrom').value), ftp=parseDateStr($('#fTo').value);
+  const ff=ffp?new Date(ffp.y,ffp.mo-1,ffp.d,0,0):null;
+  const ft=ftp?new Date(ftp.y,ftp.mo-1,ftp.d,23,59):null;
   let rows=state.assignments.filter(a=>{
     if(fp&&a.full_name!==fp)return false;if(fl&&a.location!==fl)return false;
     const s=new Date(a.start_time);if(ff&&s<ff)return false;if(ft&&s>ft)return false;return true;
