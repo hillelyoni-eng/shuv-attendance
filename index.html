@@ -526,8 +526,9 @@
       </div>
       <div class="card">
         <h3>📍 מיקומים <span class="badge" id="locCnt" style="background:var(--accent-soft);color:var(--accent);padding:1px 8px;border-radius:999px;font-size:12px"></span></h3>
-        <div class="add-inline">
-          <input id="newLocName" placeholder="שם מיקום…" />
+        <div class="add-inline" style="flex-wrap:wrap">
+          <input id="newLocName" placeholder="שם מיקום…" style="flex:1 1 45%" />
+          <input id="newLocAliases" placeholder="כינויים (אופציונלי, בפסיקים)…" style="flex:1 1 45%" />
           <button class="btn primary sm" id="addLoc">הוסף</button>
         </div>
         <div id="locList"></div>
@@ -789,32 +790,37 @@ const Data = {
   },
 
   /* ----- mutations ----- */
+  async _cloudSync(){ try{await this.refreshCloud();}catch(e){} renderAll(); },
   async addPerson(full_name,population_type){
-    if(connMode==='cloud'){const{error}=await sb.from('personnel').insert({full_name,population_type});if(error)throw error;}
+    if(connMode==='cloud'){const{error}=await sb.from('personnel').insert({full_name,population_type});if(error)throw error;await this._cloudSync();}
     else{state.personnel.push({id:uid(),full_name,population_type});this.saveLocal();renderAll();}
   },
   async delPerson(id){
-    if(connMode==='cloud'){const{error}=await sb.from('personnel').delete().eq('id',id);if(error)throw error;}
+    if(connMode==='cloud'){const{error}=await sb.from('personnel').delete().eq('id',id);if(error)throw error;await this._cloudSync();}
     else{state.personnel=state.personnel.filter(x=>x.id!=id);this.saveLocal();renderAll();}
   },
-  async addLoc(name){
-    if(connMode==='cloud'){const{error}=await sb.from('locations').insert({name});if(error)throw error;}
-    else{state.locations.push({id:uid(),name});this.saveLocal();renderAll();}
+  async addLoc(name,aliases){
+    if(connMode==='cloud'){const{error}=await sb.from('locations').insert({name,aliases:aliases||null});if(error)throw error;await this._cloudSync();}
+    else{state.locations.push({id:uid(),name,aliases:aliases||''});this.saveLocal();renderAll();}
+  },
+  async updateLoc(id,patch){
+    if(connMode==='cloud'){const{error}=await sb.from('locations').update(patch).eq('id',id);if(error)throw error;await this._cloudSync();}
+    else{const l=state.locations.find(x=>x.id==id);if(l)Object.assign(l,patch);this.saveLocal();renderAll();}
   },
   async delLoc(id){
-    if(connMode==='cloud'){const{error}=await sb.from('locations').delete().eq('id',id);if(error)throw error;}
+    if(connMode==='cloud'){const{error}=await sb.from('locations').delete().eq('id',id);if(error)throw error;await this._cloudSync();}
     else{state.locations=state.locations.filter(x=>x.id!=id);this.saveLocal();renderAll();}
   },
   async addAsg(rec){
-    if(connMode==='cloud'){const{error}=await sb.from('assignments').insert(rec);if(error)throw error;}
+    if(connMode==='cloud'){const{error}=await sb.from('assignments').insert(rec);if(error)throw error;await this._cloudSync();}
     else{state.assignments.unshift(Object.assign({id:uid(),created_at:new Date().toISOString()},rec));this.saveLocal();renderAll();}
   },
   async updateAsg(id,rec){
-    if(connMode==='cloud'){const{error}=await sb.from('assignments').update(rec).eq('id',id);if(error)throw error;}
+    if(connMode==='cloud'){const{error}=await sb.from('assignments').update(rec).eq('id',id);if(error)throw error;await this._cloudSync();}
     else{const a=state.assignments.find(x=>x.id==id);if(a)Object.assign(a,rec);this.saveLocal();renderAll();}
   },
   async delAsg(id){
-    if(connMode==='cloud'){const{error}=await sb.from('assignments').delete().eq('id',id);if(error)throw error;}
+    if(connMode==='cloud'){const{error}=await sb.from('assignments').delete().eq('id',id);if(error)throw error;await this._cloudSync();}
     else{state.assignments=state.assignments.filter(x=>x.id!=id);this.saveLocal();renderAll();}
   },
   /* ----- access allowlist (cloud + admin only) ----- */
@@ -884,6 +890,7 @@ async function handleAuth(session){
   if(!row){ myRole=null; openGate('denied'); renderTopUser(); return; }
   myRole=row.role;
   closeGate(); renderTopUser();
+  try{ if(session && sb.realtime) sb.realtime.setAuth(session.access_token); }catch(e){}
   try{ await Data.refreshCloud(); }catch(e){}
   subscribeRealtime();
   renderAll();
@@ -1194,14 +1201,21 @@ function renderManage(){
   const ll=$('#locList');ll.innerHTML='';
   if(!state.locations.length)ll.innerHTML='<div class="form-note">אין מיקומים. הוסף מיקומים למעלה.</div>';
   state.locations.forEach(l=>{
-    const it=el('div','list-item',
-      `<div class="av" style="background:var(--panel-2);color:var(--accent)">📍</div>
-       <div class="info"><div class="nm">${esc(l.name)}</div></div>
-       <button class="x" title="מחק">×</button>`);
+    const it=el('div','list-item');
+    it.style.flexWrap='wrap';
+    it.innerHTML=`<div class="av" style="background:var(--panel-2);color:var(--accent)">📍</div>
+       <div class="info" style="flex:1;min-width:110px"><div class="nm">${esc(l.name)}</div></div>
+       <button class="x" title="מחק">×</button>
+       <input class="alias-inp" style="flex:1 1 100%;margin-top:9px;font-size:12.5px;padding:8px 11px" placeholder="כינויים נוספים (בפסיקים): BCP, מוטורולה, APC" value="${esc(l.aliases||'')}" />`;
     it.querySelector('.x').onclick=async()=>{
       if(!confirm('למחוק את המיקום '+l.name+'?'))return;
       try{await Data.delLoc(l.id);}catch(e){toast('שגיאה: '+e.message,'err');}
     };
+    const ai=it.querySelector('.alias-inp');
+    const save=async()=>{ if((ai.value.trim())===String(l.aliases||'').trim())return;
+      try{await Data.updateLoc(l.id,{aliases:ai.value.trim()});toast('כינויים עודכנו ל'+l.name,'ok');}catch(e){toast('שגיאה: '+e.message,'err');} };
+    ai.addEventListener('blur',save);
+    ai.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();ai.blur();}});
     ll.appendChild(it);
   });
 }
@@ -1320,11 +1334,19 @@ function cmdFindPerson(text){
   });
   return exact||sub;
 }
+function locAliases(l){
+  return [l.name, ...String(l.aliases||'').split(',').map(s=>s.trim()).filter(Boolean)];
+}
 function cmdFindLocations(text){
+  const low=text.toLowerCase();
   const res=[];
   state.locations.forEach(l=>{
-    const idx=text.indexOf(l.name);
-    if(idx>=0)res.push({name:l.name,idx});
+    let bestIdx=-1;
+    locAliases(l).forEach(n=>{
+      const idx=low.indexOf(n.toLowerCase());
+      if(idx>=0 && (bestIdx<0 || idx<bestIdx)) bestIdx=idx;
+    });
+    if(bestIdx>=0) res.push({name:l.name,idx:bestIdx});
   });
   return res.sort((a,b)=>a.idx-b.idx);
 }
@@ -1423,8 +1445,15 @@ function bind(){
     $('#clockD').textContent=d.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   }
   tick();setInterval(tick,1000);
-  // periodic re-render so live/ending states stay fresh
-  setInterval(()=>{if($('#view-dash').classList.contains('active'))renderDashboard();},30000);
+  // periodic refresh — keeps the live board current across devices even if realtime is off
+  setInterval(async()=>{
+    if(connMode==='cloud' && authUser){
+      try{ await Data.refreshCloud();
+        const typing=document.activeElement && ['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName);
+        if(typing) renderDashboard(); else renderAll();
+      }catch(e){}
+    } else if($('#view-dash').classList.contains('active')){ renderDashboard(); }
+  },15000);
 
   // command bar (free-text NLP)
   const runCmd=()=>{const v=$('#cmdInput').value;if(!v.trim())return;runCommand(v).then(()=>{$('#cmdInput').value='';});};
@@ -1456,8 +1485,9 @@ function bind(){
   $('#newPersonName').addEventListener('keydown',e=>{if(e.key==='Enter')$('#addPerson').click();});
   $('#addLoc').onclick=async()=>{
     const n=$('#newLocName').value.trim();
+    const al=$('#newLocAliases').value.trim();
     if(!n){toast('הזן שם מיקום','err');return;}
-    try{await Data.addLoc(n);$('#newLocName').value='';toast('נוסף','ok');}catch(e){toast('שגיאה: '+e.message,'err');}
+    try{await Data.addLoc(n,al);$('#newLocName').value='';$('#newLocAliases').value='';toast('נוסף','ok');}catch(e){toast('שגיאה: '+e.message,'err');}
   };
   $('#newLocName').addEventListener('keydown',e=>{if(e.key==='Enter')$('#addLoc').click();});
   $('#seedDemo').onclick=()=>{if(connMode==='cloud'){toast('טעינת הדגמה זמינה במצב מקומי בלבד','err');return;}if(confirm('לטעון נתוני הדגמה? זה יחליף את הנתונים המקומיים.'))seedDemo();};
