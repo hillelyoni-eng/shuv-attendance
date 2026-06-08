@@ -334,6 +334,29 @@
   .toast.err{border-inline-start-color:var(--danger)}
   @keyframes slidein{from{transform:translateX(-20px);opacity:0}to{transform:none;opacity:1}}
 
+  /* ===== Auth gate ===== */
+  .auth-gate{
+    position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:24px;
+    background:
+      radial-gradient(1000px 500px at 80% -10%, rgba(45,212,191,.08), transparent 60%),
+      radial-gradient(900px 450px at 10% 110%, rgba(91,157,255,.06), transparent 55%),
+      var(--bg);
+  }
+  .auth-gate.open{display:flex;animation:fade .2s}
+  .auth-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:40px 34px;max-width:430px;width:100%;text-align:center;box-shadow:var(--shadow)}
+  .auth-card .logo{width:66px;height:66px;border-radius:18px;margin:0 auto 20px;background:linear-gradient(140deg,var(--accent),var(--accent-dim));display:grid;place-items:center;color:#06201d;font-weight:800;font-size:32px;box-shadow:0 6px 20px rgba(45,212,191,.3)}
+  .auth-card h2{font-size:23px;font-weight:700;margin-bottom:10px;letter-spacing:-.3px}
+  .auth-card p{font-size:14px;color:var(--txt-dim);line-height:1.65;margin-bottom:24px}
+  .gbtn{display:inline-flex;align-items:center;gap:12px;width:100%;justify-content:center;padding:13px;border-radius:11px;background:#fff;color:#1f2937;font-weight:600;font-size:15px;border:none;transition:.15s}
+  .gbtn:hover{filter:brightness(.95)}
+  .gbtn svg{width:20px;height:20px}
+  .auth-foot{margin-top:18px;font-size:12px;color:var(--txt-faint)}
+  .userChip{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 12px;border-radius:999px;background:var(--panel);border:1px solid var(--line);font-size:12.5px;font-weight:600;max-width:230px}
+  .userChip .uav{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#06201d;display:grid;place-items:center;font-weight:700;font-size:11px;flex:0 0 auto}
+  .userChip .uem{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr}
+  .userChip button{color:var(--txt-faint);border-inline-start:1px solid var(--line);padding-inline-start:9px;margin-inline-start:2px;font-size:12px;font-weight:600;flex:0 0 auto}
+  .userChip button:hover{color:var(--danger)}
+
   .fab{
     position:fixed;bottom:26px;inset-inline-end:26px;z-index:50;
     display:flex;align-items:center;gap:9px;padding:14px 20px;border-radius:14px;
@@ -359,6 +382,7 @@
     </div>
   </div>
   <div class="clock"><div class="t" id="clockT">--:--</div><div class="d" id="clockD">—</div></div>
+  <div class="userChip" id="userChip" style="display:none"></div>
   <div class="conn local" id="connBadge" title="מצב חיבור">
     <span class="dot"></span><span id="connText">מקומי</span>
     <button id="connBtn">חיבור ענן</button>
@@ -464,6 +488,16 @@
         <div class="form-note" style="margin-top:14px">מיקום שיש בו שיבוצים פעילים יופיע בלוח המצב. מחיקת מיקום אינה מוחקת שיבוצים היסטוריים.</div>
       </div>
     </div>
+    <div class="card" id="permCard" style="margin-top:18px;display:none">
+      <h3>🔐 ניהול הרשאות גישה <span class="badge" id="permCnt" style="background:var(--accent-soft);color:var(--accent);padding:1px 8px;border-radius:999px;font-size:12px"></span></h3>
+      <div class="add-inline">
+        <input id="newAllowEmail" placeholder="כתובת Gmail לאישור…" dir="ltr" style="text-align:right" />
+        <select id="newAllowRole" style="flex:0 0 130px"><option value="member">מנהל רגיל</option><option value="admin">מנהל-על</option></select>
+        <button class="btn primary sm" id="addAllow">אשר גישה</button>
+      </div>
+      <div id="allowList"></div>
+      <div class="form-note" style="margin-top:12px">רק כתובות ברשימה יכולות להיכנס למערכת. "מנהל-על" יכול גם לנהל את רשימת ההרשאות הזו. אינך יכול להסיר את עצמך.</div>
+    </div>
     <div class="card" style="margin-top:18px">
       <h3>🗄️ נתונים</h3>
       <div class="row">
@@ -564,6 +598,28 @@
   </div>
 </div>
 
+<!-- ===== Auth Gate ===== -->
+<div class="auth-gate" id="authGate">
+  <div class="auth-card">
+    <div class="logo">ש</div>
+    <div id="authLogin">
+      <h2>שו"ב נוכחות</h2>
+      <p>הגישה למערכת מוגבלת למשתמשים מורשים בלבד.<br/>התחבר עם חשבון Google כדי להמשיך.</p>
+      <button class="gbtn" id="googleBtn">
+        <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.3 0-9.7-3.1-11.3-7.6l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.6l6.2 5.2C41.4 36.4 44 30.8 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
+        התחבר עם Google
+      </button>
+      <button class="btn ghost sm" id="gateLocal" style="margin-top:14px">המשך במצב מקומי (ללא ענן)</button>
+      <div class="auth-foot">ההרשאות מנוהלות על ידי מנהל המערכת.</div>
+    </div>
+    <div id="authDenied" style="display:none">
+      <h2>אין הרשאת גישה</h2>
+      <p>הכתובת <b id="deniedEmail" dir="ltr"></b><br/>אינה מופיעה ברשימת המורשים. פנה למנהל המערכת לקבלת גישה.</p>
+      <button class="btn" id="signoutDenied">התנתק ונסה חשבון אחר</button>
+    </div>
+  </div>
+</div>
+
 <div id="toasts"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -617,6 +673,9 @@ let sb = null;            // supabase client
 let connMode = 'local';   // 'local' | 'cloud' | 'err'
 let planWeekStart = startOfWeek(new Date());
 let editingId = null;
+let authUser = null;      // signed-in Supabase auth user (cloud mode)
+let myRole = null;        // 'admin' | 'member' | null
+let authWired = false;
 
 /* =========================================================================
    Helpers
@@ -708,6 +767,10 @@ const Data = {
     if(connMode==='cloud'){const{error}=await sb.from('assignments').delete().eq('id',id);if(error)throw error;}
     else{state.assignments=state.assignments.filter(x=>x.id!=id);this.saveLocal();renderAll();}
   },
+  /* ----- access allowlist (cloud + admin only) ----- */
+  async listAllowed(){const{data,error}=await sb.from('allowed_users').select('*').order('added_at');if(error)throw error;return data||[];},
+  async addAllowed(email,role){const{error}=await sb.from('allowed_users').insert({email:email.toLowerCase(),role});if(error)throw error;},
+  async delAllowed(email){const{error}=await sb.from('allowed_users').delete().eq('email',email);if(error)throw error;},
 };
 
 /* =========================================================================
@@ -716,15 +779,24 @@ const Data = {
 async function connectCloud(url,key,silent){
   if(!window.supabase){toast('ספריית הענן לא נטענה — בדוק חיבור אינטרנט','err');return false;}
   try{
-    sb = window.supabase.createClient(url,key,{realtime:{params:{eventsPerSecond:5}}});
-    await Data.refreshCloud();         // validates connection + schema
+    sb = window.supabase.createClient(url,key,{
+      auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true},
+      realtime:{params:{eventsPerSecond:5}}
+    });
+    // validate URL/key + schema. With auth-gated RLS, anon SELECT returns empty (no error) — that's fine.
+    const probe = await sb.from('assignments').select('id').limit(1);
+    if(probe.error){
+      if(probe.error.code==='42P01') throw new Error('הטבלאות לא נוצרו — הרץ את ה‑SQL ב‑Supabase');
+      if(/Invalid API key|JWT|apikey/i.test(probe.error.message||'')) throw new Error('מפתח לא תקין');
+    }
     cfg={url,key};
     localStorage.setItem(LS.cfg,JSON.stringify(cfg));
     connMode='cloud';
-    subscribeRealtime();
     setConn();
-    renderAll();
-    if(!silent)toast('מחובר לענן — סנכרון בזמן אמת פעיל','ok');
+    if(!authWired){ sb.auth.onAuthStateChange((_e,session)=>handleAuth(session)); authWired=true; }
+    const {data:{session}} = await sb.auth.getSession();
+    await handleAuth(session);
+    if(!silent && !session) toast('מחובר לענן — התחבר עם Google כדי להמשיך','ok');
     return true;
   }catch(e){
     connMode = cfg?'err':'local';
@@ -734,17 +806,84 @@ async function connectCloud(url,key,silent){
   }
 }
 function subscribeRealtime(){
+  try{sb.removeAllChannels();}catch(e){}
   sb.channel('shuv-rt')
     .on('postgres_changes',{event:'*',schema:'public'},async()=>{
       try{await Data.refreshCloud();renderAll();}catch(e){}
     }).subscribe();
 }
 function disconnectCloud(){
-  if(sb){try{sb.removeAllChannels();}catch(e){}}
-  sb=null;cfg=null;connMode='local';
+  if(sb){try{sb.auth.signOut();}catch(e){} try{sb.removeAllChannels();}catch(e){}}
+  sb=null;cfg=null;connMode='local';authUser=null;myRole=null;authWired=false;
   localStorage.removeItem(LS.cfg);
+  closeGate();renderTopUser();
   Data.loadLocal();setConn();renderAll();
   toast('נותק מהענן — חזרה למצב מקומי');
+}
+
+/* ----- authentication gate ----- */
+async function handleAuth(session){
+  authUser = session ? session.user : null;
+  if(connMode!=='cloud'){ closeGate(); renderTopUser(); return; }
+  if(!authUser){ openGate('login'); renderTopUser(); refreshAllowlist(); return; }
+  let row=null;
+  try{
+    const r=await sb.from('allowed_users').select('email,role').eq('email',(authUser.email||'').toLowerCase()).maybeSingle();
+    row=r.data;
+  }catch(e){ row=null; }
+  if(!row){ myRole=null; openGate('denied'); renderTopUser(); return; }
+  myRole=row.role;
+  closeGate(); renderTopUser();
+  try{ await Data.refreshCloud(); }catch(e){}
+  subscribeRealtime();
+  renderAll();
+  refreshAllowlist();
+}
+function openGate(mode){
+  $('#authLogin').style.display = mode==='login'?'':'none';
+  $('#authDenied').style.display = mode==='denied'?'':'none';
+  if(mode==='denied') $('#deniedEmail').textContent = authUser?authUser.email:'';
+  $('#authGate').classList.add('open');
+}
+function closeGate(){ $('#authGate').classList.remove('open'); }
+function renderTopUser(){
+  const chip=$('#userChip');
+  if(connMode==='cloud' && authUser){
+    chip.style.display='';
+    chip.innerHTML=`<span class="uav">${esc((authUser.email||'?')[0].toUpperCase())}</span><span class="uem">${esc(authUser.email)}</span><button id="signoutBtn" title="התנתק">יציאה</button>`;
+    $('#signoutBtn').onclick=signOut;
+  }else{ chip.style.display='none'; chip.innerHTML=''; }
+}
+async function googleSignIn(){
+  if(!sb){toast('התחבר קודם לענן','err');return;}
+  const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});
+  if(error)toast('שגיאת התחברות: '+error.message,'err');
+}
+async function signOut(){
+  try{await sb.auth.signOut();}catch(e){}
+  authUser=null;myRole=null;
+  if(connMode==='cloud')openGate('login');
+  renderTopUser();
+}
+async function refreshAllowlist(){
+  const card=$('#permCard');
+  if(connMode!=='cloud' || myRole!=='admin'){ card.style.display='none'; return; }
+  card.style.display='';
+  let rows=[];
+  try{ rows=await Data.listAllowed(); }catch(e){ rows=[]; }
+  $('#permCnt').textContent=rows.length;
+  const list=$('#allowList');list.innerHTML='';
+  rows.forEach(r=>{
+    const isMe = authUser && r.email===(authUser.email||'').toLowerCase();
+    const it=el('div','list-item',
+      `<div class="av" style="background:${r.role==='admin'?'var(--warn)':'var(--accent)'};color:#06201d">${r.role==='admin'?'★':'✓'}</div>
+       <div class="info"><div class="nm" dir="ltr" style="text-align:right">${esc(r.email)}${isMe?' <span style="color:var(--txt-faint);font-weight:500">(אתה)</span>':''}</div></div>
+       <span class="ptag ${r.role==='admin'?'yoetz':'saddir'}">${r.role==='admin'?'מנהל-על':'מנהל'}</span>
+       ${isMe?'':'<button class="x" title="הסר גישה">×</button>'}`);
+    const x=it.querySelector('.x');
+    if(x)x.onclick=async()=>{ if(!confirm('להסיר גישה ל‑'+r.email+'?'))return; try{await Data.delAllowed(r.email);refreshAllowlist();toast('ההרשאה הוסרה');}catch(e){toast('שגיאה: '+e.message,'err');} };
+    list.appendChild(it);
+  });
 }
 function setConn(){
   const b=$('#connBadge');b.className='conn '+connMode;
@@ -1124,6 +1263,7 @@ function seedDemo(){
 function switchView(v){
   $$('#tabs button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   $$('.view').forEach(s=>s.classList.toggle('active',s.id==='view-'+v));
+  if(v==='manage')refreshAllowlist();
 }
 function bind(){
   // tabs
@@ -1237,6 +1377,19 @@ function bind(){
     else{const e=new Date(sv);e.setHours(e.getHours()+h);$('#asgEnd').value=localInputValue(e);}
   });
 
+  // auth gate
+  $('#googleBtn').onclick=googleSignIn;
+  $('#signoutDenied').onclick=signOut;
+  $('#gateLocal').onclick=disconnectCloud;
+  // access allowlist
+  $('#addAllow').onclick=async()=>{
+    const email=$('#newAllowEmail').value.trim().toLowerCase();
+    const role=$('#newAllowRole').value;
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast('הזן כתובת מייל תקינה','err');return;}
+    try{ await Data.addAllowed(email,role); $('#newAllowEmail').value=''; refreshAllowlist(); toast('הגישה אושרה ל‑'+email,'ok'); }
+    catch(e){toast('שגיאה: '+e.message,'err');}
+  };
+  $('#newAllowEmail').addEventListener('keydown',e=>{if(e.key==='Enter')$('#addAllow').click();});
   // cloud modal
   $('#connBtn').onclick=openCloud;
   $('#cloudConnect').onclick=async()=>{
