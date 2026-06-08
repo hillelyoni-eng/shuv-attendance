@@ -1465,14 +1465,22 @@ async function runCommand(raw){
   else if(lastLoc){action='present';location=lastLoc;}
   else {toast('לא הובן מה לעדכן עבור '+person.full_name+'. נסה: "בדרך ל…", "הגיע ל…", "יצא הביתה".','err');return;}
   if((action==='enroute'||action==='present') && !location){toast('לא זוהה מיקום מוכר בפקודה.','err');return;}
-  await executeCommand(person,action,location,when,shift);
+  const hasTime = /\d{1,2}:\d{2}/.test(text);
+  await executeCommand(person,action,location,when,shift,hasTime);
 }
-async function executeCommand(person,action,location,when,shift){
+function endOfDayISO(fromISO,hour){
+  const e=new Date(fromISO); e.setHours(hour,0,0,0);
+  if(e<=new Date(fromISO)) e.setDate(e.getDate()+1);
+  return e.toISOString();
+}
+async function executeCommand(person,action,location,when,shift,hasTime){
   const ts=when.toISOString();
   let st=ts, et=null;
-  if(shift){ const w=shiftWindow(shift,new Date()); st=w.start.toISOString(); et=w.end.toISOString(); }
-  else if(action==='present'||action==='enroute'){ const e=new Date(st); e.setHours(21,0,0,0); if(e>new Date(st)) et=e.toISOString(); } // ברירת מחדל עד 21:00
-  const shTxt = shift?' · '+shift.ic+' '+shift.label:'';
+  // שעת התחלה מפורשת גוברת על מילת משמרת → סיום ברירת מחדל 22:00 (לעולם לא פתוח)
+  if(hasTime && (action==='present'||action==='enroute')){ st=ts; et=endOfDayISO(st,22); }
+  else if(shift){ const w=shiftWindow(shift,new Date()); st=w.start.toISOString(); et=w.end.toISOString(); }
+  else if(action==='present'||action==='enroute'){ et=endOfDayISO(st,21); } // ללא זמן מפורש → עד 21:00
+  const shTxt = (shift && !hasTime)?' · '+shift.ic+' '+shift.label:'';
   const open=state.assignments.find(a=>a.full_name===person.full_name && status(a)==='live');
   try{
     if(action==='left'){
@@ -1482,8 +1490,9 @@ async function executeCommand(person,action,location,when,shift){
     }
     if(action==='present' && open && open.location===location){
       const patch={travel_status:'present'};
-      if(shift){patch.start_time=st;patch.end_time=et;}
-      else if(!open.end_time){ const e=new Date(); e.setHours(21,0,0,0); if(e>new Date(open.start_time)) patch.end_time=e.toISOString(); }
+      if(hasTime){patch.start_time=st;patch.end_time=et;}
+      else if(shift){patch.start_time=st;patch.end_time=et;}
+      else if(!open.end_time){ patch.end_time=endOfDayISO(open.start_time,21); }
       await Data.updateAsg(open.id,patch);
       toast('✓ '+person.full_name+' — הגיע/ה ל'+location+shTxt,'ok');
       return;
