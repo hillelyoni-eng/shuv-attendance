@@ -1321,18 +1321,25 @@ function cmdParseTime(text){
   const d=new Date();d.setHours(h,mi,0,0);
   return d;
 }
+function cmdStripPrefix(w){ return /^[לבמהושכ].{2,}$/.test(w)?w.slice(1):w; }
+// Returns {person} | {person:null} | {ambiguous:true, candidates:[...]}
+// Matches by ANY name token (first OR last name); full-name match outscores partial;
+// a partial that fits several people is reported as ambiguous.
 function cmdFindPerson(text){
-  // whole-word match (avoids "בר" matching inside "ברק"); strip leading Hebrew prefixes
   const words=text.split(/[\s,.;:!?"'()]+/).filter(Boolean);
-  const strip=w=>(/^[לבמהושכ].{2,}$/.test(w)?w.slice(1):w);
-  const wordSet=new Set([...words, ...words.map(strip)]);
-  let exact=null,sub=null;
+  const wset=new Set();
+  words.forEach(w=>{wset.add(w);wset.add(cmdStripPrefix(w));});
+  const scored=[];
   state.personnel.forEach(p=>{
     const tokens=String(p.full_name).split(/\s+/).filter(t=>t.length>=2);
-    if(!exact && tokens.some(t=>wordSet.has(t))) exact=p;
-    if(!sub && tokens.some(t=>text.includes(t))) sub=p;
+    let s=0; tokens.forEach(t=>{ if(wset.has(t)) s++; });
+    if(s>0) scored.push({p,s});
   });
-  return exact||sub;
+  if(!scored.length) return {person:null};
+  const max=Math.max(...scored.map(x=>x.s));
+  const top=scored.filter(x=>x.s===max).map(x=>x.p);
+  if(top.length===1) return {person:top[0]};
+  return {ambiguous:true, candidates:top};
 }
 function locAliases(l){
   return [l.name, ...String(l.aliases||'').split(',').map(s=>s.trim()).filter(Boolean)];
@@ -1353,8 +1360,10 @@ function cmdFindLocations(text){
 async function runCommand(raw){
   const text=(raw||'').trim();
   if(!text)return;
-  const person=cmdFindPerson(text);
-  if(!person){toast('לא זוהה אדם מוכר בפקודה. ודא שהשם קיים ברשימת כוח האדם.','err');return;}
+  const pf=cmdFindPerson(text);
+  if(pf.ambiguous){toast('קשה לדעת במי מדובר — יש כמה אנשים מתאימים: '+pf.candidates.map(p=>p.full_name).join(' · ')+'. ציין שם מלא.','err');return;}
+  if(!pf.person){toast('לא זוהה אדם מוכר בפקודה. ודא שהשם קיים ברשימת כוח האדם.','err');return;}
+  const person=pf.person;
   const when=cmdParseTime(text);
   const locs=cmdFindLocations(text);
   const lastLoc = locs.length?locs[locs.length-1].name:null;
