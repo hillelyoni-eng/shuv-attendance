@@ -635,6 +635,10 @@
 /* ---------- constants ---------- */
 const POP_CLASS = {'סדיר':'saddir','מילואים':'miluim','יועץ':'yoetz'};
 const LS = {cfg:'shuv_cfg', ppl:'shuv_ppl', loc:'shuv_loc', asg:'shuv_asg'};
+// ----- Built-in cloud connection (auto-connect on load) -----
+// Safe to embed: with auth-gated RLS + allowlist, this key alone grants nothing.
+const SUPA_URL = 'https://gibdfaijjjwqruszvajy.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpYmRmYWlqamp3cXJ1c3p2YWp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MDMxMjYsImV4cCI6MjA5NjQ3OTEyNn0.QopUP87yXIAno72sT-9diBw6U_VX1GxBWhpv3Y16W6M';
 const SQL_SETUP = `-- שו"ב נוכחות — Supabase schema
 create table if not exists personnel (
   id bigint generated always as identity primary key,
@@ -1450,11 +1454,14 @@ async function boot(){
   try{cfg=JSON.parse(localStorage.getItem(LS.cfg)||'null');}catch(e){cfg=null;}
   await Data.loadLocal();
   setConn();renderAll();
-  if(cfg&&cfg.url&&cfg.key){
+  // use saved config if present, otherwise the built-in cloud connection
+  const url = (cfg&&cfg.url) || SUPA_URL;
+  const key = (cfg&&cfg.key) || SUPA_KEY;
+  if(url&&key){
     toast('מתחבר לענן…');
-    await connectCloud(cfg.url,cfg.key,true);
+    await connectCloud(url,key,true);
   }else{
-    // first-run: if totally empty, gently seed demo so the screen isn't blank
+    // no cloud configured at all — local sandbox with demo data
     if(!state.personnel.length&&!state.assignments.length){
       seedDemo();
       toast('נטענו נתוני הדגמה — התחל לעבוד או חבר ענן','ok');
